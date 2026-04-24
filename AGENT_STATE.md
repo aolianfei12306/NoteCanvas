@@ -1,0 +1,36 @@
+# Current Goal
+
+- 从零创建 `NoteCanvas` 桌面应用。
+- 第一版提供：文件夹分组、笔记列表、自由画布文本块、鼠标手绘、区域导出 PNG 并可拖到文件夹或网页。
+
+# Completed Milestones
+
+- 已确认用户偏好：桌面应用、笔记页 + 画布、自由画布 + 文本块、未来同步仅做本地可扩展架构、区域导出采用矩形框选 + 直接拖拽。
+- 已完成项目骨架创建，目录位于 `/home/cjdockers/shm/Git/NoteCanvas`。
+- 已完成 Electron 主进程、preload、React 侧边栏、自由画布编辑器、文本块、手绘、区域导出与拖拽链路。
+- 已补充 README、设计文档、ADR 和基础测试。
+
+# Architecture Assumptions
+
+- 使用 Electron + React + TypeScript。
+- 本地数据先保存为单文件工作库，保留稳定 `id`、`revision`、`schemaVersion` 以便未来接入同步。
+- 区域导出通过渲染选区为 PNG，再由 Electron 主进程启动原生文件拖拽。
+
+# Open Questions
+
+- 项目目录名由我暂定为 `NoteCanvas`，用户未提出异议。
+
+# Blockers
+
+- 当前无功能性阻塞。
+- 尚未在有图形桌面的真实窗口中做人工交互验收。
+
+# Next Action
+
+- 如需进一步确认体验，可在桌面环境执行 `npm run dev` 做真实拖拽与输入验收。
+
+# Last Verification
+
+- `npm run build`：通过；Electron 与前端产物已输出到 `dist` 和 `dist-electron`
+- `npm run lint`：通过
+- `npm run test`：通过，`shared/model.test.ts` 共 4 项测试全部通过
