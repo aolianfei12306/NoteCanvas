@@ -887,6 +887,7 @@ export function BoardEditor({
                         block={block}
                         active={activeTextBlockId === block.id}
                         interactive={canEditText && isActivePage && pageCanEditLayer && block.layerId === page.activeLayerId}
+                        scale={zoom}
                         onActivate={(blockId) => {
                           setActivePage(page.id)
                           onActiveTextBlockChange(blockId)

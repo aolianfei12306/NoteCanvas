@@ -8,6 +8,7 @@ interface RichTextBlockProps {
   block: TextBlockRecord
   active: boolean
   interactive: boolean
+  scale: number
   onActivate: (blockId: string) => void
   onChange: (block: TextBlockRecord) => void
   onRemove: (blockId: string) => void
@@ -17,6 +18,7 @@ export function RichTextBlock({
   block,
   active,
   interactive,
+  scale,
   onActivate,
   onChange,
   onRemove,
@@ -40,6 +42,7 @@ export function RichTextBlock({
       className={clsx('text-block-shell', active && 'active', !interactive && 'readonly')}
       size={{ width: block.width, height: block.height }}
       position={{ x: block.x, y: block.y }}
+      scale={scale}
       disableDragging={!canEdit}
       enableResizing={canEdit}
       dragHandleClassName="text-block-drag-handle"
