@@ -288,7 +288,7 @@ export function BoardEditor({
   }
 
   function addLayer() {
-    const layer = createLayer(`?? ${activePage.layers.length + 1}`)
+    const layer = createLayer(`图层 ${activePage.layers.length + 1}`)
 
     updatePage(activePage.id, (page) => ({
       ...page,
@@ -312,7 +312,7 @@ export function BoardEditor({
       return
     }
 
-    const nextName = window.prompt('?????', currentLayer.name)?.trim()
+    const nextName = window.prompt('重命名图层', currentLayer.name)?.trim()
     if (!nextName) {
       return
     }
@@ -448,7 +448,7 @@ export function BoardEditor({
 
   function eraseAt(page: BoardPageRecord, point: Point) {
     if (!canEditLayer(page)) {
-      setExportMessage('??????????')
+      setExportMessage('当前图层已锁定或隐藏')
       return
     }
 
@@ -475,7 +475,7 @@ export function BoardEditor({
       }
 
       if (!canEditLayer(page)) {
-        setExportMessage('??????????')
+        setExportMessage('当前图层已锁定或隐藏')
         return
       }
 
@@ -490,7 +490,7 @@ export function BoardEditor({
         y: point.y,
         width: 420,
         height: 180,
-        html: '<p>?????</p>',
+        html: '<p>输入文字…</p>',
       })
 
       updatePage(page.id, (currentPage) => ({
@@ -517,7 +517,7 @@ export function BoardEditor({
 
     if (tool === 'pen') {
       if (!canEditLayer(page)) {
-        setExportMessage('??????????')
+        setExportMessage('当前图层已锁定或隐藏')
         return
       }
 
@@ -632,12 +632,12 @@ export function BoardEditor({
 
   async function getSelectionDataUrl() {
     if (!selection || !selectionKey) {
-      throw new Error('??????????')
+      throw new Error('当前没有可导出的区域')
     }
 
     const pageElement = pageRefs.current.get(selection.pageId)
     if (!pageElement) {
-      throw new Error('???????')
+      throw new Error('画布尚未准备好')
     }
 
     if (exportCacheRef.current?.key === selectionKey) {
@@ -666,7 +666,7 @@ export function BoardEditor({
         setDragLoading(true)
         const pageElement = pageRefs.current.get(activeSelection.pageId)
         if (!pageElement) {
-          throw new Error('???????')
+          throw new Error('画布尚未准备好')
         }
 
         const dataUrl =
@@ -689,7 +689,7 @@ export function BoardEditor({
         }
       } catch (error) {
         if (!cancelled) {
-          setExportMessage(error instanceof Error ? error.message : '???????')
+          setExportMessage(error instanceof Error ? error.message : '拖拽预处理失败')
         }
       } finally {
         if (!cancelled) {
@@ -710,9 +710,9 @@ export function BoardEditor({
       setExportBusy('copy')
       const dataUrl = await getSelectionDataUrl()
       await window.noteCanvas.copyImage(dataUrl)
-      setExportMessage('??? PNG ????')
+      setExportMessage('已复制 PNG 到剪贴板')
     } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : '????')
+      setExportMessage(error instanceof Error ? error.message : '复制失败')
     } finally {
       setExportBusy(null)
     }
@@ -727,10 +727,10 @@ export function BoardEditor({
         `${makeExportName(note.title)}-selection`,
       )
       if (result) {
-        setExportMessage(`???? ${result}`)
+        setExportMessage(`已导出到 ${result}`)
       }
     } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : '????')
+      setExportMessage(error instanceof Error ? error.message : '导出失败')
     } finally {
       setExportBusy(null)
     }
@@ -753,17 +753,17 @@ export function BoardEditor({
     <div className="board-shell">
       <div className="board-page-controls" data-export-ignore="true">
         <div className="page-actions">
-          <span>? {pages.length} ?</span>
+          <span>共 {pages.length} 页</span>
           <button className="secondary-button" type="button" onClick={addPage}>
             <Plus size={14} />
-            <span>??</span>
+            <span>加页</span>
           </button>
         </div>
 
         <div className="layer-panel">
           <div className="layer-panel-header">
-            <span>???{activeLayer?.name}</span>
-            <button className="icon-button subtle" type="button" onClick={addLayer} aria-label="????">
+            <span>图层：{activeLayer?.name}</span>
+            <button className="icon-button subtle" type="button" onClick={addLayer} aria-label="新增图层">
               <Plus size={14} />
             </button>
           </div>
@@ -778,20 +778,20 @@ export function BoardEditor({
                     type="button"
                     onClick={() => selectLayer(layer.id)}
                     onDoubleClick={() => renameLayer(layer.id)}
-                    title="???????"
+                    title="双击重命名图层"
                   >
                     {layer.name}
                   </button>
-                  <button className="icon-button subtle" type="button" onClick={() => toggleLayerVisibility(layer.id)} aria-label="??????">
+                  <button className="icon-button subtle" type="button" onClick={() => toggleLayerVisibility(layer.id)} aria-label="切换图层显示">
                     {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
                   </button>
-                  <button className="icon-button subtle" type="button" onClick={() => toggleLayerLock(layer.id)} aria-label="??????">
+                  <button className="icon-button subtle" type="button" onClick={() => toggleLayerLock(layer.id)} aria-label="切换图层锁定">
                     {layer.locked ? <Lock size={14} /> : <Unlock size={14} />}
                   </button>
-                  <button className="icon-button subtle" type="button" onClick={() => moveLayer(layer.id, 1)} disabled={layerIndex === activePage.layers.length - 1} aria-label="????">
+                  <button className="icon-button subtle" type="button" onClick={() => moveLayer(layer.id, 1)} disabled={layerIndex === activePage.layers.length - 1} aria-label="上移图层">
                     <ArrowUp size={14} />
                   </button>
-                  <button className="icon-button subtle" type="button" onClick={() => moveLayer(layer.id, -1)} disabled={layerIndex === 0} aria-label="????">
+                  <button className="icon-button subtle" type="button" onClick={() => moveLayer(layer.id, -1)} disabled={layerIndex === 0} aria-label="下移图层">
                     <ArrowDown size={14} />
                   </button>
                 </div>
@@ -812,9 +812,9 @@ export function BoardEditor({
               <section key={page.id} className={clsx('board-page-shell', isActivePage && 'active')}>
                 <div className="board-page-meta" data-export-ignore="true">
                   <button type="button" onClick={() => setActivePage(page.id)}>
-                    ? {pageIndex + 1} ?
+                    第 {pageIndex + 1} 页
                   </button>
-                  <span>{page.width} ? {page.height}</span>
+                  <span>{page.width} × {page.height}</span>
                 </div>
 
                 <div
@@ -934,20 +934,20 @@ export function BoardEditor({
                           {dragLoading ? (
                             <>
                               <LoaderCircle size={14} className="spin" />
-                              <span>?????</span>
+                              <span>准备拖拽…</span>
                             </>
                           ) : (
-                            <span>?? PNG</span>
+                            <span>拖出 PNG</span>
                           )}
                         </div>
 
                         <button className="secondary-button" type="button" onClick={handleCopy}>
                           <Copy size={14} />
-                          <span>{exportBusy === 'copy' ? '????' : '??'}</span>
+                          <span>{exportBusy === 'copy' ? '复制中…' : '复制'}</span>
                         </button>
                         <button className="secondary-button" type="button" onClick={handleSave}>
                           <Download size={14} />
-                          <span>{exportBusy === 'save' ? '????' : '?? PNG'}</span>
+                          <span>{exportBusy === 'save' ? '导出中…' : '另存 PNG'}</span>
                         </button>
                       </div>
                     ) : null}
@@ -960,8 +960,8 @@ export function BoardEditor({
       </div>
 
       <div className="editor-statusbar">
-        <span>{tool === 'export' ? '?????? / ??????????? PNG' : '???????????????'}</span>
-        <span>{exportMessage ?? `??? ${activePage.width} ? ${activePage.height} ? ?? ${Math.round(zoom * 100)}%`}</span>
+        <span>{tool === 'export' ? '拖拽到文件夹 / 网页上传区即可落为完整 PNG' : '本页支持文本块、手绘与区域导出'}</span>
+        <span>{exportMessage ?? `当前页 ${activePage.width} × ${activePage.height} · 缩放 ${Math.round(zoom * 100)}%`}</span>
       </div>
     </div>
   )

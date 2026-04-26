@@ -122,7 +122,7 @@ export interface LibrarySnapshot {
 const SCHEMA_VERSION = 1
 export const DEFAULT_BOARD_WIDTH = 1440
 export const DEFAULT_BOARD_HEIGHT = 1800
-const UNTITLED_NOTE = '?????'
+const UNTITLED_NOTE = '未命名笔记'
 
 function nowIso() {
   return new Date().toISOString()
@@ -132,7 +132,7 @@ function makeId(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`
 }
 
-export function createFolder(name = '?????', parentId: string | null = null): FolderRecord {
+export function createFolder(name = '新建文件夹', parentId: string | null = null): FolderRecord {
   const createdAt = nowIso()
 
   return {
@@ -144,7 +144,7 @@ export function createFolder(name = '?????', parentId: string | null = null): Fo
   }
 }
 
-export function createLayer(name = '?? 1', partial: Partial<LayerRecord> = {}): LayerRecord {
+export function createLayer(name = '图层 1', partial: Partial<LayerRecord> = {}): LayerRecord {
   const createdAt = nowIso()
 
   return {
@@ -167,7 +167,7 @@ export function createTextBlock(partial: Partial<TextBlockRecord> = {}): TextBlo
     y: partial.y ?? 120,
     width: partial.width ?? 520,
     height: partial.height ?? 180,
-    html: partial.html ?? '<h1>????</h1><p>????????????????????</p>',
+    html: partial.html ?? '<h1>新建笔记</h1><p>在这里输入文字，或切到画笔开始写写画画。</p>',
     createdAt: partial.createdAt ?? createdAt,
     updatedAt: partial.updatedAt ?? createdAt,
   }
@@ -221,8 +221,8 @@ function normalizeShape(shape: Partial<ShapeRecord>, fallbackLayerId: string): S
 export function createBoardPage(partial: BoardPageInput = {}): BoardPageRecord {
   const createdAt = nowIso()
   const layers = Array.isArray(partial.layers) && partial.layers.length > 0
-    ? partial.layers.map((layer, index) => createLayer(`?? ${index + 1}`, layer))
-    : [createLayer('?? 1')]
+    ? partial.layers.map((layer, index) => createLayer(`图层 ${index + 1}`, layer))
+    : [createLayer('图层 1')]
   const layerIds = new Set(layers.map((layer) => layer.id))
   const activeLayerId = partial.activeLayerId && layerIds.has(partial.activeLayerId)
     ? partial.activeLayerId
@@ -285,7 +285,7 @@ export function createNote(folderId: string, title = UNTITLED_NOTE, withStarterC
         width: 620,
         height: 240,
         html:
-          '<h1>???? NoteCanvas</h1><p>??????????????????? PNG?</p><ul><li>?????????????</li><li>??????????????</li><li>???????????????????</li></ul>',
+          '<h1>欢迎使用 NoteCanvas</h1><p>这里适合快速记事、写草图和圈选区域导出 PNG。</p><ul><li>文本工具：新建可拖拽文本块</li><li>画笔工具：直接用鼠标写写画画</li><li>导出工具：框选后可复制、另存或拖出图片</li></ul>',
       }),
     )
   }
@@ -371,9 +371,9 @@ export function sanitizeFileName(input: string) {
 }
 
 export function createDefaultLibrary(): LibrarySnapshot {
-  const inbox = createFolder('???')
-  const ideas = createFolder('???')
-  const welcome = createNote(inbox.id, '???? NoteCanvas', true)
+  const inbox = createFolder('收件箱')
+  const ideas = createFolder('灵感池')
+  const welcome = createNote(inbox.id, '欢迎使用 NoteCanvas', true)
 
   return {
     schemaVersion: SCHEMA_VERSION,

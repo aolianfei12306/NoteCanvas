@@ -60,10 +60,10 @@ const PEN_TOOL_ITEMS: Array<{
   label: string
   icon: LucideIcon
 }> = [
-  { key: 'freehand', label: '??', icon: Pencil },
-  { key: 'line', label: '??', icon: Minus },
-  { key: 'rectangle', label: '??', icon: Square },
-  { key: 'ellipse', label: '??', icon: Circle },
+  { key: 'freehand', label: '自由', icon: Pencil },
+  { key: 'line', label: '直线', icon: Minus },
+  { key: 'rectangle', label: '矩形', icon: Square },
+  { key: 'ellipse', label: '椭圆', icon: Circle },
 ]
 
 const TOOL_ITEMS: Array<{
@@ -71,23 +71,23 @@ const TOOL_ITEMS: Array<{
   label: string
   icon: LucideIcon
 }> = [
-  { key: 'browse', label: '??', icon: MousePointer2 },
-  { key: 'text', label: '??', icon: Type },
-  { key: 'pen', label: '??', icon: Pencil },
-  { key: 'eraser', label: '??', icon: Eraser },
-  { key: 'export', label: '????', icon: Crop },
+  { key: 'browse', label: '移动', icon: MousePointer2 },
+  { key: 'text', label: '文本', icon: Type },
+  { key: 'pen', label: '画笔', icon: Pencil },
+  { key: 'eraser', label: '橡皮', icon: Eraser },
+  { key: 'export', label: '框选导出', icon: Crop },
 ]
 
 function saveLabel(state: EditorToolbarProps['saveState']) {
   switch (state) {
     case 'saving':
-      return '?????'
+      return '正在保存…'
     case 'saved':
-      return '?????'
+      return '已自动保存'
     case 'error':
-      return '????'
+      return '保存失败'
     default:
-      return '?????'
+      return '本地离线库'
   }
 }
 
@@ -134,10 +134,10 @@ export function EditorToolbar({
         </div>
 
         <div className="toolbar-group compact">
-          <button className="icon-text-button" type="button" onClick={onUndo} disabled={!canUndo} aria-label="??">
+          <button className="icon-text-button" type="button" onClick={onUndo} disabled={!canUndo} aria-label="撤销">
             <Undo2 size={16} />
           </button>
-          <button className="icon-text-button" type="button" onClick={onRedo} disabled={!canRedo} aria-label="??">
+          <button className="icon-text-button" type="button" onClick={onRedo} disabled={!canRedo} aria-label="重做">
             <Redo2 size={16} />
           </button>
         </div>
@@ -204,7 +204,7 @@ export function EditorToolbar({
             onClick={() => onFillShapesChange(!fillShapes)}
           >
             <PaintBucket size={16} />
-            <span>??</span>
+            <span>填充</span>
           </button>
           {COLORS.map((color) => (
             <button
@@ -213,10 +213,10 @@ export function EditorToolbar({
               type="button"
               style={{ backgroundColor: color }}
               onClick={() => onPenColorChange(color)}
-              aria-label={`?????? ${color}`}
+              aria-label={`切换画笔颜色 ${color}`}
             />
           ))}
-          <label className="custom-color-control" aria-label="???????">
+          <label className="custom-color-control" aria-label="自定义画笔颜色">
             <Palette size={16} />
             <input
               type="color"
@@ -225,7 +225,7 @@ export function EditorToolbar({
             />
           </label>
           <label className="range-control">
-            <span>??</span>
+            <span>粗细</span>
             <input
               type="range"
               min="2"
@@ -235,7 +235,7 @@ export function EditorToolbar({
             />
           </label>
           <label className="range-control">
-            <span>??</span>
+            <span>透明</span>
             <input
               type="range"
               min="0.2"

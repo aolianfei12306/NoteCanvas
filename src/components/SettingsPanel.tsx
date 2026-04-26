@@ -46,60 +46,60 @@ export function SettingsPanel({
     try {
       await window.noteCanvas.openDataPath()
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '????????')
+      setMessage(error instanceof Error ? error.message : '无法打开数据目录')
     }
   }
 
   async function exportLibrary() {
     try {
       const result = await window.noteCanvas.exportLibrary(library)
-      setMessage(result ? `???? ${result}` : '?????')
+      setMessage(result ? `已导出到 ${result}` : '已取消导出')
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '???????')
+      setMessage(error instanceof Error ? error.message : '导出工作库失败')
     }
   }
 
   return (
-    <div className="settings-backdrop" role="dialog" aria-modal="true" aria-label="??">
+    <div className="settings-backdrop" role="dialog" aria-modal="true" aria-label="设置">
       <section className="settings-panel">
         <header className="settings-header">
           <div>
             <p className="eyebrow">Settings</p>
-            <h2>??</h2>
+            <h2>设置</h2>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="????">
+          <button className="icon-button" type="button" onClick={onClose} aria-label="关闭设置">
             <X size={16} />
           </button>
         </header>
 
         <div className="settings-grid">
           <label className="setting-field">
-            <span>??</span>
+            <span>主题</span>
             <select
               value={settings.theme}
               onChange={(event) => updateSettings({ theme: event.target.value as AppSettings['theme'] })}
             >
-              <option value="system">????</option>
-              <option value="light">??</option>
-              <option value="dark">??</option>
+              <option value="system">跟随系统</option>
+              <option value="light">浅色</option>
+              <option value="dark">深色</option>
             </select>
           </label>
 
           <label className="setting-field">
-            <span>??????</span>
+            <span>自动保存间隔</span>
             <select
               value={settings.autosaveIntervalMs}
               onChange={(event) => updateSettings({ autosaveIntervalMs: Number(event.target.value) })}
             >
-              <option value={500}>0.5 ?</option>
-              <option value={1000}>1 ?</option>
-              <option value={3000}>3 ?</option>
-              <option value={5000}>5 ?</option>
+              <option value={500}>0.5 秒</option>
+              <option value={1000}>1 秒</option>
+              <option value={3000}>3 秒</option>
+              <option value={5000}>5 秒</option>
             </select>
           </label>
 
           <label className="setting-field">
-            <span>??????</span>
+            <span>默认画布宽度</span>
             <input
               type="number"
               min="640"
@@ -109,7 +109,7 @@ export function SettingsPanel({
           </label>
 
           <label className="setting-field">
-            <span>??????</span>
+            <span>默认画布高度</span>
             <input
               type="number"
               min="640"
@@ -119,7 +119,7 @@ export function SettingsPanel({
           </label>
 
           <label className="setting-field">
-            <span>??????</span>
+            <span>默认画笔颜色</span>
             <input
               type="color"
               value={settings.defaultPenColor}
@@ -128,7 +128,7 @@ export function SettingsPanel({
           </label>
 
           <label className="setting-field">
-            <span>??????</span>
+            <span>默认画笔粗细</span>
             <input
               type="range"
               min="2"
@@ -140,26 +140,26 @@ export function SettingsPanel({
         </div>
 
         <section className="settings-section-card">
-          <h3>????</h3>
+          <h3>热键绑定</h3>
           <div className="hotkey-grid">
-            <label><span>??</span><input value={settings.hotkeys.undo} onChange={(event) => updateHotkey('undo', event.target.value)} /></label>
-            <label><span>??</span><input value={settings.hotkeys.redo} onChange={(event) => updateHotkey('redo', event.target.value)} /></label>
-            <label><span>??</span><input value={settings.hotkeys.zoomIn} onChange={(event) => updateHotkey('zoomIn', event.target.value)} /></label>
-            <label><span>??</span><input value={settings.hotkeys.zoomOut} onChange={(event) => updateHotkey('zoomOut', event.target.value)} /></label>
+            <label><span>撤销</span><input value={settings.hotkeys.undo} onChange={(event) => updateHotkey('undo', event.target.value)} /></label>
+            <label><span>重做</span><input value={settings.hotkeys.redo} onChange={(event) => updateHotkey('redo', event.target.value)} /></label>
+            <label><span>放大</span><input value={settings.hotkeys.zoomIn} onChange={(event) => updateHotkey('zoomIn', event.target.value)} /></label>
+            <label><span>缩小</span><input value={settings.hotkeys.zoomOut} onChange={(event) => updateHotkey('zoomOut', event.target.value)} /></label>
           </div>
         </section>
 
         <section className="settings-section-card">
-          <h3>????</h3>
-          <p>{dataPath ?? '?????????'}</p>
+          <h3>本地数据</h3>
+          <p>{dataPath ?? '正在读取数据目录…'}</p>
           <div className="settings-actions">
             <button className="secondary-button" type="button" onClick={openDataPath}>
               <FolderOpen size={14} />
-              <span>??????</span>
+              <span>打开数据目录</span>
             </button>
             <button className="secondary-button" type="button" onClick={exportLibrary}>
               <Save size={14} />
-              <span>?????</span>
+              <span>导出工作库</span>
             </button>
           </div>
           {message ? <p className="settings-message">{message}</p> : null}
