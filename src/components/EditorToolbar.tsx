@@ -7,7 +7,9 @@ import {
   List,
   MousePointer2,
   Pencil,
+  Redo2,
   Type,
+  Undo2,
 } from 'lucide-react'
 import type { ToolMode } from '../../shared/model'
 import type { TextFormatCommand } from '../lib/textFormat'
@@ -18,10 +20,14 @@ interface EditorToolbarProps {
   penWidth: number
   saveState: 'idle' | 'saving' | 'saved' | 'error'
   canFormatText: boolean
+  canUndo: boolean
+  canRedo: boolean
   onToolChange: (tool: ToolMode) => void
   onPenColorChange: (color: string) => void
   onPenWidthChange: (width: number) => void
   onFormat: (command: TextFormatCommand) => void
+  onUndo: () => void
+  onRedo: () => void
 }
 
 const COLORS = ['#111827', '#1d4ed8', '#9333ea', '#dc2626', '#059669']
@@ -57,10 +63,14 @@ export function EditorToolbar({
   penWidth,
   saveState,
   canFormatText,
+  canUndo,
+  canRedo,
   onToolChange,
   onPenColorChange,
   onPenWidthChange,
   onFormat,
+  onUndo,
+  onRedo,
 }: EditorToolbarProps) {
   return (
     <div className="editor-toolbar">
@@ -103,6 +113,15 @@ export function EditorToolbar({
             onChange={(event) => onPenWidthChange(Number(event.target.value))}
           />
         </label>
+      </div>
+
+      <div className="toolbar-group compact">
+        <button className="icon-text-button" type="button" onClick={onUndo} disabled={!canUndo} aria-label="撤销">
+          <Undo2 size={16} />
+        </button>
+        <button className="icon-text-button" type="button" onClick={onRedo} disabled={!canRedo} aria-label="重做">
+          <Redo2 size={16} />
+        </button>
       </div>
 
       <div className="toolbar-group compact">

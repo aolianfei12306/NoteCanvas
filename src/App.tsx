@@ -8,6 +8,24 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { applyTextFormat, type TextFormatCommand } from './lib/textFormat'
 import { applyTheme, loadAppSettings, saveAppSettings, type AppSettings } from './lib/settings'
 
+function hotkeyMatches(event: KeyboardEvent, hotkey: string) {
+  const normalized = hotkey.toLowerCase().replace(/\s+/g, '')
+  const key = normalized.endsWith('++') ? '+' : normalized.split('+').at(-1)
+  const wantsCtrl = normalized.includes('ctrl+')
+  const wantsShift = normalized.includes('shift+')
+  const wantsAlt = normalized.includes('alt+')
+  const wantsMeta = normalized.includes('meta+') || normalized.includes('cmd+')
+  const eventKey = event.key.length === 1 ? event.key.toLowerCase() : event.key.toLowerCase()
+
+  return (
+    eventKey === key &&
+    event.ctrlKey === wantsCtrl &&
+    event.shiftKey === wantsShift &&
+    event.altKey === wantsAlt &&
+    event.metaKey === wantsMeta
+  )
+}
+
 function App() {
   const [settings, setSettings] = useState(loadAppSettings)
   const [library, setLibrary] = useState<LibrarySnapshot | null>(null)
@@ -22,6 +40,9 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [dataPath, setDataPath] = useState<string | null>(null)
   const skipNextSaveRef = useRef(true)
+  const historyByNoteRef = useRef(new Map<string, { past: NoteRecord[]; future: NoteRecord[] }>())
+  const applyingHistoryRef = useRef(false)
+  const [, setHistoryVersion] = useState(0)
 
   useEffect(() => {
     async function bootstrap() {
@@ -81,6 +102,24 @@ function App() {
     window.noteCanvas.getDataPath().then(setDataPath).catch(() => setDataPath('无法读取数据目录'))
   }, [settingsOpen])
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (hotkeyMatches(event, settings.hotkeys.undo)) {
+        event.preventDefault()
+        handleUndo()
+        return
+      }
+
+      if (hotkeyMatches(event, settings.hotkeys.redo)) {
+        event.preventDefault()
+        handleRedo()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  })
+
   const folders = useMemo(() => (library ? sortFolders(library.folders) : []), [library])
 
   const allNotes = useMemo(() => {
@@ -125,6 +164,9 @@ function App() {
         { pages: 0, textBlocks: 0, strokes: 0 },
       )
     : { pages: 0, textBlocks: 0, strokes: 0 }
+  const currentHistory = selectedNoteId ? historyByNoteRef.current.get(selectedNoteId) : null
+  const canUndo = Boolean(currentHistory?.past.length)
+  const canRedo = Boolean(currentHistory?.future.length)
 
   function updateLibrary(transformer: (previous: LibrarySnapshot) => LibrarySnapshot) {
     setLibrary((previous) => {
@@ -258,11 +300,66 @@ function App() {
   }
 
   function handleCurrentNoteChange(nextNote: NoteRecord) {
+    if (!applyingHistoryRef.current) {
+      const previousNote = allNotes.find((note) => note.id === nextNote.id)
+      if (previousNote && previousNote !== nextNote) {
+        const history = historyByNoteRef.current.get(nextNote.id) ?? { past: [], future: [] }
+        historyByNoteRef.current.set(nextNote.id, {
+          past: [...history.past, previousNote].slice(-80),
+          future: [],
+        })
+        setHistoryVersion((version) => version + 1)
+      }
+    }
+
     updateLibrary((previous) => ({
       ...previous,
       notes: sortNotes(previous.notes.map((note) => (note.id === nextNote.id ? nextNote : note))),
       lastOpenedNoteId: nextNote.id,
     }))
+  }
+
+  function applyHistoryNote(nextNote: NoteRecord) {
+    applyingHistoryRef.current = true
+    handleCurrentNoteChange(nextNote)
+    applyingHistoryRef.current = false
+    setHistoryVersion((version) => version + 1)
+  }
+
+  function handleUndo() {
+    if (!currentNote) {
+      return
+    }
+
+    const history = historyByNoteRef.current.get(currentNote.id)
+    const previousNote = history?.past.at(-1)
+    if (!history || !previousNote) {
+      return
+    }
+
+    historyByNoteRef.current.set(currentNote.id, {
+      past: history.past.slice(0, -1),
+      future: [currentNote, ...history.future],
+    })
+    applyHistoryNote(previousNote)
+  }
+
+  function handleRedo() {
+    if (!currentNote) {
+      return
+    }
+
+    const history = historyByNoteRef.current.get(currentNote.id)
+    const nextNote = history?.future[0]
+    if (!history || !nextNote) {
+      return
+    }
+
+    historyByNoteRef.current.set(currentNote.id, {
+      past: [...history.past, currentNote].slice(-80),
+      future: history.future.slice(1),
+    })
+    applyHistoryNote(nextNote)
   }
 
   function handleFormat(command: TextFormatCommand) {
@@ -371,10 +468,14 @@ function App() {
           penWidth={penWidth}
           saveState={saveState}
           canFormatText={Boolean(activeTextBlockId)}
+          canUndo={canUndo}
+          canRedo={canRedo}
           onToolChange={handleToolChange}
           onPenColorChange={setPenColor}
           onPenWidthChange={setPenWidth}
           onFormat={handleFormat}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
         />
 
         {currentNote ? (
