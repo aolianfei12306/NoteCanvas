@@ -15,6 +15,7 @@ import {
   Square,
   Type,
   Undo2,
+  type LucideIcon,
 } from 'lucide-react'
 import type { PenToolMode, ToolMode } from '../../shared/model'
 import type { TextFormatCommand } from '../lib/textFormat'
@@ -57,36 +58,36 @@ const COLORS = [
 const PEN_TOOL_ITEMS: Array<{
   key: PenToolMode
   label: string
-  icon: typeof Pencil
+  icon: LucideIcon
 }> = [
-  { key: 'freehand', label: '自由', icon: Pencil },
-  { key: 'line', label: '直线', icon: Minus },
-  { key: 'rectangle', label: '矩形', icon: Square },
-  { key: 'ellipse', label: '椭圆', icon: Circle },
+  { key: 'freehand', label: '??', icon: Pencil },
+  { key: 'line', label: '??', icon: Minus },
+  { key: 'rectangle', label: '??', icon: Square },
+  { key: 'ellipse', label: '??', icon: Circle },
 ]
 
 const TOOL_ITEMS: Array<{
   key: ToolMode
   label: string
-  icon: typeof MousePointer2
+  icon: LucideIcon
 }> = [
-  { key: 'browse', label: '移动', icon: MousePointer2 },
-  { key: 'text', label: '文本', icon: Type },
-  { key: 'pen', label: '画笔', icon: Pencil },
-  { key: 'eraser', label: '橡皮', icon: Eraser },
-  { key: 'export', label: '框选导出', icon: Crop },
+  { key: 'browse', label: '??', icon: MousePointer2 },
+  { key: 'text', label: '??', icon: Type },
+  { key: 'pen', label: '??', icon: Pencil },
+  { key: 'eraser', label: '??', icon: Eraser },
+  { key: 'export', label: '????', icon: Crop },
 ]
 
 function saveLabel(state: EditorToolbarProps['saveState']) {
   switch (state) {
     case 'saving':
-      return '正在保存…'
+      return '?????'
     case 'saved':
-      return '已自动保存'
+      return '?????'
     case 'error':
-      return '保存失败'
+      return '????'
     default:
-      return '本地离线库'
+      return '?????'
   }
 }
 
@@ -113,26 +114,75 @@ export function EditorToolbar({
 }: EditorToolbarProps) {
   return (
     <div className="editor-toolbar">
-      <div className="toolbar-group">
-        {TOOL_ITEMS.map((item) => {
-          const Icon = item.icon
+      <div className="toolbar-main-row">
+        <div className="toolbar-group">
+          {TOOL_ITEMS.map((item) => {
+            const Icon = item.icon
 
-          return (
-            <button
-              key={item.key}
-              className={clsx('tool-button', tool === item.key && 'active')}
-              type="button"
-              onClick={() => onToolChange(item.key)}
-            >
-              <Icon size={16} />
-              <span>{item.label}</span>
-            </button>
-          )
-        })}
+            return (
+              <button
+                key={item.key}
+                className={clsx('tool-button', tool === item.key && 'active')}
+                type="button"
+                onClick={() => onToolChange(item.key)}
+              >
+                <Icon size={16} />
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="toolbar-group compact">
+          <button className="icon-text-button" type="button" onClick={onUndo} disabled={!canUndo} aria-label="??">
+            <Undo2 size={16} />
+          </button>
+          <button className="icon-text-button" type="button" onClick={onRedo} disabled={!canRedo} aria-label="??">
+            <Redo2 size={16} />
+          </button>
+        </div>
+
+        <div className="toolbar-group compact">
+          <button
+            className="icon-text-button"
+            type="button"
+            onMouseDown={(event) => {
+              event.preventDefault()
+              onFormat('bold')
+            }}
+            disabled={!canFormatText}
+          >
+            <Bold size={16} />
+          </button>
+          <button
+            className="icon-text-button"
+            type="button"
+            onMouseDown={(event) => {
+              event.preventDefault()
+              onFormat('italic')
+            }}
+            disabled={!canFormatText}
+          >
+            <Italic size={16} />
+          </button>
+          <button
+            className="icon-text-button"
+            type="button"
+            onMouseDown={(event) => {
+              event.preventDefault()
+              onFormat('insertUnorderedList')
+            }}
+            disabled={!canFormatText}
+          >
+            <List size={16} />
+          </button>
+        </div>
+
+        <div className={clsx('save-chip', saveState)}>{saveLabel(saveState)}</div>
       </div>
 
       {tool === 'pen' ? (
-        <div className="toolbar-group compact">
+        <div className="pen-subtoolbar">
           {PEN_TOOL_ITEMS.map((item) => {
             const Icon = item.icon
 
@@ -154,7 +204,7 @@ export function EditorToolbar({
             onClick={() => onFillShapesChange(!fillShapes)}
           >
             <PaintBucket size={16} />
-            <span>填充</span>
+            <span>??</span>
           </button>
           {COLORS.map((color) => (
             <button
@@ -163,10 +213,10 @@ export function EditorToolbar({
               type="button"
               style={{ backgroundColor: color }}
               onClick={() => onPenColorChange(color)}
-              aria-label={`切换画笔颜色 ${color}`}
+              aria-label={`?????? ${color}`}
             />
           ))}
-          <label className="custom-color-control" aria-label="自定义画笔颜色">
+          <label className="custom-color-control" aria-label="???????">
             <Palette size={16} />
             <input
               type="color"
@@ -175,7 +225,7 @@ export function EditorToolbar({
             />
           </label>
           <label className="range-control">
-            <span>粗细</span>
+            <span>??</span>
             <input
               type="range"
               min="2"
@@ -185,7 +235,7 @@ export function EditorToolbar({
             />
           </label>
           <label className="range-control">
-            <span>透明</span>
+            <span>??</span>
             <input
               type="range"
               min="0.2"
@@ -197,53 +247,6 @@ export function EditorToolbar({
           </label>
         </div>
       ) : null}
-
-      <div className="toolbar-group compact">
-        <button className="icon-text-button" type="button" onClick={onUndo} disabled={!canUndo} aria-label="撤销">
-          <Undo2 size={16} />
-        </button>
-        <button className="icon-text-button" type="button" onClick={onRedo} disabled={!canRedo} aria-label="重做">
-          <Redo2 size={16} />
-        </button>
-      </div>
-
-      <div className="toolbar-group compact">
-        <button
-          className="icon-text-button"
-          type="button"
-          onMouseDown={(event) => {
-            event.preventDefault()
-            onFormat('bold')
-          }}
-          disabled={!canFormatText}
-        >
-          <Bold size={16} />
-        </button>
-        <button
-          className="icon-text-button"
-          type="button"
-          onMouseDown={(event) => {
-            event.preventDefault()
-            onFormat('italic')
-          }}
-          disabled={!canFormatText}
-        >
-          <Italic size={16} />
-        </button>
-        <button
-          className="icon-text-button"
-          type="button"
-          onMouseDown={(event) => {
-            event.preventDefault()
-            onFormat('insertUnorderedList')
-          }}
-          disabled={!canFormatText}
-        >
-          <List size={16} />
-        </button>
-      </div>
-
-      <div className={clsx('save-chip', saveState)}>{saveLabel(saveState)}</div>
     </div>
   )
 }
