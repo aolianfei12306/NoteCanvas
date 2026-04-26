@@ -173,6 +173,26 @@ button {
   color: inherit;
 }
 
+.folder-rename-form {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px 8px 14px;
+}
+
+.folder-rename-form input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(217, 119, 6, 0.24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #111827;
+  outline: 0;
+  padding: 6px 8px;
+}
+
 .note-card-main {
   align-items: flex-start;
   flex-direction: column;

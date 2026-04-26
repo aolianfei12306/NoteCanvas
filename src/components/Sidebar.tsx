@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import clsx from 'clsx'
 import {
   Folder,
@@ -15,7 +16,7 @@ interface SidebarProps {
   selectedNoteId: string | null
   onSelectFolder: (folderId: string) => void
   onCreateFolder: () => void
-  onRenameFolder: (folderId: string) => void
+  onRenameFolder: (folderId: string, name: string) => void
   onDeleteFolder: (folderId: string) => void
   onCreateNote: () => void
   onSelectNote: (noteId: string) => void
@@ -52,7 +53,24 @@ export function Sidebar({
   onSelectNote,
   onDeleteNote,
 }: SidebarProps) {
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
   const visibleNotes = notes.filter((note) => note.folderId === selectedFolderId)
+
+  function startRename(folder: FolderRecord) {
+    setRenamingFolderId(folder.id)
+    setRenameDraft(folder.name)
+  }
+
+  function finishRename(folderId: string) {
+    const nextName = renameDraft.trim()
+    if (nextName) {
+      onRenameFolder(folderId, nextName)
+    }
+
+    setRenamingFolderId(null)
+    setRenameDraft('')
+  }
 
   return (
     <aside className="sidebar">
@@ -79,24 +97,49 @@ export function Sidebar({
 
             return (
               <div key={folder.id} className={clsx('sidebar-row', isActive && 'active')}>
-                <button
-                  className="sidebar-main-button"
-                  type="button"
-                  onClick={() => onSelectFolder(folder.id)}
-                >
-                  <span className="sidebar-row-title">
+                {renamingFolderId === folder.id ? (
+                  <form
+                    className="folder-rename-form"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      finishRename(folder.id)
+                    }}
+                  >
                     <Folder size={16} />
-                    <span>{folder.name}</span>
-                  </span>
-                  <span className="sidebar-row-meta">{count}</span>
-                </button>
+                    <input
+                      value={renameDraft}
+                      autoFocus
+                      onBlur={() => finishRename(folder.id)}
+                      onChange={(event) => setRenameDraft(event.target.value)}
+                      onFocus={(event) => event.currentTarget.select()}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                          setRenamingFolderId(null)
+                          setRenameDraft('')
+                        }
+                      }}
+                    />
+                  </form>
+                ) : (
+                  <button
+                    className="sidebar-main-button"
+                    type="button"
+                    onClick={() => onSelectFolder(folder.id)}
+                  >
+                    <span className="sidebar-row-title">
+                      <Folder size={16} />
+                      <span>{folder.name}</span>
+                    </span>
+                    <span className="sidebar-row-meta">{count}</span>
+                  </button>
+                )}
 
                 {isActive ? (
                   <div className="sidebar-row-actions">
                     <button
                       className="icon-button"
                       type="button"
-                      onClick={() => onRenameFolder(folder.id)}
+                      onClick={() => startRename(folder)}
                       aria-label="重命名文件夹"
                     >
                       <PencilLine size={15} />

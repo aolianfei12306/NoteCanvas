@@ -125,13 +125,8 @@ function App() {
     setActiveTextBlockId(null)
   }
 
-  function handleRenameFolder(folderId: string) {
-    const current = folders.find((folder) => folder.id === folderId)
-    if (!current) {
-      return
-    }
-
-    const nextName = window.prompt('重命名文件夹', current.name)?.trim()
+  function handleRenameFolder(folderId: string, name: string) {
+    const nextName = name.trim()
     if (!nextName) {
       return
     }
