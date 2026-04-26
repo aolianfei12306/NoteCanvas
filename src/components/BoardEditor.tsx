@@ -53,6 +53,10 @@ function hitStroke(point: Point, stroke: StrokeRecord) {
   return stroke.points.some((candidate) => Math.hypot(candidate.x - point.x, candidate.y - point.y) <= stroke.width + 10)
 }
 
+function clampZoom(value: number) {
+  return Math.max(0.4, Math.min(value, 2.5))
+}
+
 export function BoardEditor({
   note,
   tool,
@@ -62,6 +66,7 @@ export function BoardEditor({
   onActiveTextBlockChange,
   onNoteChange,
 }: BoardEditorProps) {
+  const stageRef = useRef<HTMLDivElement | null>(null)
   const boardRef = useRef<HTMLDivElement | null>(null)
   const draftPointsRef = useRef<Point[]>([])
   const pointerModeRef = useRef<'draw' | 'erase' | 'select' | null>(null)
@@ -74,6 +79,7 @@ export function BoardEditor({
   const [dragLoading, setDragLoading] = useState(false)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [exportBusy, setExportBusy] = useState<'copy' | 'save' | null>(null)
+  const [zoom, setZoom] = useState(1)
 
   const canEditText = tool === 'browse' || tool === 'text'
 
@@ -107,13 +113,48 @@ export function BoardEditor({
     }
 
     const bounds = boardRef.current.getBoundingClientRect()
-    const x = event.clientX - bounds.left
-    const y = event.clientY - bounds.top
+    const scaleX = note.document.width / bounds.width
+    const scaleY = note.document.height / bounds.height
+    const x = (event.clientX - bounds.left) * scaleX
+    const y = (event.clientY - bounds.top) * scaleY
 
     return {
       x: Math.max(0, Math.min(x, note.document.width)),
       y: Math.max(0, Math.min(y, note.document.height)),
     }
+  }
+
+  function handleStageWheel(event: React.WheelEvent<HTMLDivElement>) {
+    if (!event.ctrlKey || !stageRef.current) {
+      return
+    }
+
+    event.preventDefault()
+
+    const stage = stageRef.current
+    const bounds = stage.getBoundingClientRect()
+    const anchorX = event.clientX - bounds.left
+    const anchorY = event.clientY - bounds.top
+    const scrollAnchorX = stage.scrollLeft + anchorX
+    const scrollAnchorY = stage.scrollTop + anchorY
+
+    setZoom((currentZoom) => {
+      const nextZoom = clampZoom(currentZoom * Math.exp(-event.deltaY * 0.0015))
+
+      if (nextZoom === currentZoom) {
+        return currentZoom
+      }
+
+      const boardAnchorX = scrollAnchorX / currentZoom
+      const boardAnchorY = scrollAnchorY / currentZoom
+
+      window.requestAnimationFrame(() => {
+        stage.scrollLeft = boardAnchorX * nextZoom - anchorX
+        stage.scrollTop = boardAnchorY * nextZoom - anchorY
+      })
+
+      return nextZoom
+    })
   }
 
   function removeTextBlock(blockId: string) {
@@ -374,13 +415,21 @@ export function BoardEditor({
 
   return (
     <div className="board-shell">
-      <div className="board-stage">
+      <div ref={stageRef} className="board-stage" onWheel={handleStageWheel}>
+        <div
+          className="board-zoom-frame"
+          style={{
+            width: note.document.width * zoom,
+            height: note.document.height * zoom,
+          }}
+        >
         <div
           ref={boardRef}
           className={clsx('board-surface', tool === 'export' && 'selection-mode')}
           style={{
             width: note.document.width,
             height: note.document.height,
+            transform: `scale(${zoom})`,
           }}
           onPointerDown={handleBoardPointerDown}
         >
@@ -488,11 +537,12 @@ export function BoardEditor({
             </div>
           ) : null}
         </div>
+        </div>
       </div>
 
       <div className="editor-statusbar">
         <span>{tool === 'export' ? '拖拽到文件夹 / 网页上传区即可落为完整 PNG' : '本页支持文本块、手绘与区域导出'}</span>
-        <span>{exportMessage ?? `画布尺寸 ${note.document.width} × ${note.document.height}`}</span>
+        <span>{exportMessage ?? `画布尺寸 ${note.document.width} × ${note.document.height} · 缩放 ${Math.round(zoom * 100)}%`}</span>
       </div>
     </div>
   )

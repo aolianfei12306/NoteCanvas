@@ -422,6 +422,16 @@ button {
     rgba(223, 211, 194, 0.45);
 }
 
+.board-zoom-frame {
+  position: relative;
+  margin: 0 auto;
+}
+
+.board-zoom-frame .board-surface {
+  margin: 0;
+  transform-origin: top left;
+}
+
 .board-surface {
   position: relative;
   margin: 0 auto;
