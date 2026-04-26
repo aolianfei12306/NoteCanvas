@@ -23,7 +23,9 @@ import {
   type BoardPageRecord,
   type ExportRect,
   type NoteRecord,
+  type PenToolMode,
   type Point,
+  type ShapeRecord,
   type StrokeRecord,
   type ToolMode,
 } from '../../shared/model'
@@ -33,6 +35,8 @@ import { RichTextBlock } from './RichTextBlock'
 interface BoardEditorProps {
   note: NoteRecord
   tool: ToolMode
+  penTool: PenToolMode
+  fillShapes: boolean
   penColor: string
   penWidth: number
   activeTextBlockId: string | null
@@ -70,8 +74,55 @@ function buildStroke(points: Point[], color: string, width: number, layerId: str
   }
 }
 
+function buildShape(
+  origin: Point,
+  point: Point,
+  kind: Exclude<PenToolMode, 'freehand'>,
+  color: string,
+  width: number,
+  fillShapes: boolean,
+  layerId: string,
+): ShapeRecord {
+  const isLine = kind === 'line'
+
+  return {
+    id: `shape_${crypto.randomUUID()}`,
+    layerId,
+    kind,
+    x: isLine ? origin.x : Math.min(origin.x, point.x),
+    y: isLine ? origin.y : Math.min(origin.y, point.y),
+    width: isLine ? point.x - origin.x : Math.abs(point.x - origin.x),
+    height: isLine ? point.y - origin.y : Math.abs(point.y - origin.y),
+    strokeColor: color,
+    strokeWidth: width,
+    strokeOpacity: 1,
+    fillColor: fillShapes && !isLine ? color : null,
+    fillOpacity: 0.18,
+    createdAt: new Date().toISOString(),
+  }
+}
+
 function hitStroke(point: Point, stroke: StrokeRecord) {
   return stroke.points.some((candidate) => Math.hypot(candidate.x - point.x, candidate.y - point.y) <= stroke.width + 10)
+}
+
+function hitShape(point: Point, shape: ShapeRecord) {
+  if (shape.kind === 'line') {
+    const start = { x: shape.x, y: shape.y }
+    const end = { x: shape.x + shape.width, y: shape.y + shape.height }
+    const lengthSquared = Math.hypot(end.x - start.x, end.y - start.y) ** 2
+    const ratio = lengthSquared === 0
+      ? 0
+      : Math.max(0, Math.min(1, ((point.x - start.x) * (end.x - start.x) + (point.y - start.y) * (end.y - start.y)) / lengthSquared))
+    const projection = {
+      x: start.x + (end.x - start.x) * ratio,
+      y: start.y + (end.y - start.y) * ratio,
+    }
+
+    return Math.hypot(point.x - projection.x, point.y - projection.y) <= shape.strokeWidth + 8
+  }
+
+  return point.x >= shape.x && point.x <= shape.x + shape.width && point.y >= shape.y && point.y <= shape.y + shape.height
 }
 
 function clampZoom(value: number) {
@@ -83,9 +134,62 @@ function canEditLayer(page: BoardPageRecord) {
   return Boolean(layer?.visible && !layer.locked)
 }
 
+function renderShape(shape: ShapeRecord) {
+  if (shape.kind === 'line') {
+    return (
+      <line
+        key={shape.id}
+        x1={shape.x}
+        y1={shape.y}
+        x2={shape.x + shape.width}
+        y2={shape.y + shape.height}
+        stroke={shape.strokeColor}
+        strokeWidth={shape.strokeWidth}
+        strokeOpacity={shape.strokeOpacity}
+        strokeLinecap="round"
+      />
+    )
+  }
+
+  if (shape.kind === 'ellipse') {
+    return (
+      <ellipse
+        key={shape.id}
+        cx={shape.x + shape.width / 2}
+        cy={shape.y + shape.height / 2}
+        rx={Math.max(1, shape.width / 2)}
+        ry={Math.max(1, shape.height / 2)}
+        fill={shape.fillColor ?? 'none'}
+        fillOpacity={shape.fillColor ? shape.fillOpacity : 0}
+        stroke={shape.strokeColor}
+        strokeWidth={shape.strokeWidth}
+        strokeOpacity={shape.strokeOpacity}
+      />
+    )
+  }
+
+  return (
+    <rect
+      key={shape.id}
+      x={shape.x}
+      y={shape.y}
+      width={Math.max(1, shape.width)}
+      height={Math.max(1, shape.height)}
+      fill={shape.fillColor ?? 'none'}
+      fillOpacity={shape.fillColor ? shape.fillOpacity : 0}
+      stroke={shape.strokeColor}
+      strokeWidth={shape.strokeWidth}
+      strokeOpacity={shape.strokeOpacity}
+      rx={10}
+    />
+  )
+}
+
 export function BoardEditor({
   note,
   tool,
+  penTool,
+  fillShapes,
   penColor,
   penWidth,
   activeTextBlockId,
@@ -95,12 +199,14 @@ export function BoardEditor({
   const stageRef = useRef<HTMLDivElement | null>(null)
   const pageRefs = useRef(new Map<string, HTMLDivElement>())
   const draftPointsRef = useRef<Point[]>([])
-  const pointerModeRef = useRef<'draw' | 'erase' | 'select' | null>(null)
+  const pointerModeRef = useRef<'draw' | 'shape' | 'erase' | 'select' | null>(null)
   const pointerPageIdRef = useRef<string | null>(null)
+  const shapeOriginRef = useRef<Point | null>(null)
   const selectionOriginRef = useRef<{ pageId: string; point: Point } | null>(null)
   const exportCacheRef = useRef<{ key: string; dataUrl: string } | null>(null)
 
   const [draftPoints, setDraftPoints] = useState<Point[]>([])
+  const [draftShape, setDraftShape] = useState<ShapeRecord | null>(null)
   const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [dragPath, setDragPath] = useState<string | null>(null)
   const [dragLoading, setDragLoading] = useState(false)
@@ -343,13 +449,17 @@ export function BoardEditor({
       return
     }
 
-    if (!page.strokes.some((stroke) => stroke.layerId === page.activeLayerId && hitStroke(point, stroke))) {
+    const hitsStroke = page.strokes.some((stroke) => stroke.layerId === page.activeLayerId && hitStroke(point, stroke))
+    const hitsShape = page.shapes.some((shape) => shape.layerId === page.activeLayerId && hitShape(point, shape))
+
+    if (!hitsStroke && !hitsShape) {
       return
     }
 
     updatePage(page.id, (currentPage) => ({
       ...currentPage,
       strokes: currentPage.strokes.filter((stroke) => stroke.layerId !== page.activeLayerId || !hitStroke(point, stroke)),
+      shapes: currentPage.shapes.filter((shape) => shape.layerId !== page.activeLayerId || !hitShape(point, shape)),
     }))
   }
 
@@ -408,6 +518,14 @@ export function BoardEditor({
         return
       }
 
+      if (penTool !== 'freehand') {
+        pointerModeRef.current = 'shape'
+        shapeOriginRef.current = point
+        setDraftShape(buildShape(point, point, penTool, penColor, penWidth, fillShapes, page.activeLayerId))
+        event.currentTarget.setPointerCapture(event.pointerId)
+        return
+      }
+
       pointerModeRef.current = 'draw'
       draftPointsRef.current = [point]
       setDraftPoints([point])
@@ -448,6 +566,11 @@ export function BoardEditor({
       return
     }
 
+    if (pointerModeRef.current === 'shape' && shapeOriginRef.current && penTool !== 'freehand') {
+      setDraftShape(buildShape(shapeOriginRef.current, point, penTool, penColor, penWidth, fillShapes, page.activeLayerId))
+      return
+    }
+
     if (pointerModeRef.current === 'erase') {
       eraseAt(page, point)
       return
@@ -482,6 +605,13 @@ export function BoardEditor({
       }))
     }
 
+    if (page && pointerModeRef.current === 'shape' && draftShape && Math.hypot(draftShape.width, draftShape.height) > 4) {
+      updatePage(page.id, (currentPage) => ({
+        ...currentPage,
+        shapes: [...currentPage.shapes, draftShape],
+      }))
+    }
+
     if (pointerModeRef.current === 'select' && selection) {
       if (selection.width < 24 || selection.height < 24) {
         setSelection(null)
@@ -489,10 +619,12 @@ export function BoardEditor({
     }
 
     draftPointsRef.current = []
+    shapeOriginRef.current = null
     selectionOriginRef.current = null
     pointerModeRef.current = null
     pointerPageIdRef.current = null
     setDraftPoints([])
+    setDraftShape(null)
   }
 
   async function getSelectionDataUrl() {
@@ -716,8 +848,9 @@ export function BoardEditor({
                       onPointerUp={handleOverlayPointerUp}
                       onPointerLeave={handleOverlayPointerUp}
                     >
-                      {page.layers.filter((layer) => layer.visible).flatMap((layer) =>
-                        page.strokes.filter((stroke) => stroke.layerId === layer.id).map((stroke) => (
+                      {page.layers.filter((layer) => layer.visible).flatMap((layer) => [
+                        ...page.shapes.filter((shape) => shape.layerId === layer.id).map(renderShape),
+                        ...page.strokes.filter((stroke) => stroke.layerId === layer.id).map((stroke) => (
                           <path
                             key={stroke.id}
                             d={pointsToPath(stroke.points)}
@@ -729,7 +862,7 @@ export function BoardEditor({
                             strokeOpacity={stroke.opacity}
                           />
                         )),
-                      )}
+                      ])}
 
                       {isActivePage && draftPoints.length > 0 ? (
                         <path
@@ -741,6 +874,8 @@ export function BoardEditor({
                           strokeWidth={penWidth}
                         />
                       ) : null}
+
+                      {isActivePage && draftShape ? renderShape(draftShape) : null}
                     </svg>
 
                     {page.textBlocks.filter((block) => visibleLayerIds.has(block.layerId)).map((block) => (

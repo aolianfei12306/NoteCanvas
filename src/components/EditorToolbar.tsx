@@ -1,21 +1,27 @@
 import clsx from 'clsx'
 import {
   Bold,
+  Circle,
   Crop,
   Eraser,
   Italic,
   List,
+  Minus,
   MousePointer2,
+  PaintBucket,
   Pencil,
   Redo2,
+  Square,
   Type,
   Undo2,
 } from 'lucide-react'
-import type { ToolMode } from '../../shared/model'
+import type { PenToolMode, ToolMode } from '../../shared/model'
 import type { TextFormatCommand } from '../lib/textFormat'
 
 interface EditorToolbarProps {
   tool: ToolMode
+  penTool: PenToolMode
+  fillShapes: boolean
   penColor: string
   penWidth: number
   saveState: 'idle' | 'saving' | 'saved' | 'error'
@@ -23,6 +29,8 @@ interface EditorToolbarProps {
   canUndo: boolean
   canRedo: boolean
   onToolChange: (tool: ToolMode) => void
+  onPenToolChange: (tool: PenToolMode) => void
+  onFillShapesChange: (fill: boolean) => void
   onPenColorChange: (color: string) => void
   onPenWidthChange: (width: number) => void
   onFormat: (command: TextFormatCommand) => void
@@ -31,6 +39,17 @@ interface EditorToolbarProps {
 }
 
 const COLORS = ['#111827', '#1d4ed8', '#9333ea', '#dc2626', '#059669']
+
+const PEN_TOOL_ITEMS: Array<{
+  key: PenToolMode
+  label: string
+  icon: typeof Pencil
+}> = [
+  { key: 'freehand', label: '自由', icon: Pencil },
+  { key: 'line', label: '直线', icon: Minus },
+  { key: 'rectangle', label: '矩形', icon: Square },
+  { key: 'ellipse', label: '椭圆', icon: Circle },
+]
 
 const TOOL_ITEMS: Array<{
   key: ToolMode
@@ -59,6 +78,8 @@ function saveLabel(state: EditorToolbarProps['saveState']) {
 
 export function EditorToolbar({
   tool,
+  penTool,
+  fillShapes,
   penColor,
   penWidth,
   saveState,
@@ -66,6 +87,8 @@ export function EditorToolbar({
   canUndo,
   canRedo,
   onToolChange,
+  onPenToolChange,
+  onFillShapesChange,
   onPenColorChange,
   onPenWidthChange,
   onFormat,
@@ -92,28 +115,53 @@ export function EditorToolbar({
         })}
       </div>
 
-      <div className="toolbar-group compact">
-        {COLORS.map((color) => (
+      {tool === 'pen' ? (
+        <div className="toolbar-group compact">
+          {PEN_TOOL_ITEMS.map((item) => {
+            const Icon = item.icon
+
+            return (
+              <button
+                key={item.key}
+                className={clsx('tool-button', penTool === item.key && 'active')}
+                type="button"
+                onClick={() => onPenToolChange(item.key)}
+              >
+                <Icon size={16} />
+                <span>{item.label}</span>
+              </button>
+            )
+          })}
           <button
-            key={color}
-            className={clsx('color-swatch', penColor === color && 'active')}
+            className={clsx('tool-button', fillShapes && 'active')}
             type="button"
-            style={{ backgroundColor: color }}
-            onClick={() => onPenColorChange(color)}
-            aria-label={`切换画笔颜色 ${color}`}
-          />
-        ))}
-        <label className="range-control">
-          <span>粗细</span>
-          <input
-            type="range"
-            min="2"
-            max="18"
-            value={penWidth}
-            onChange={(event) => onPenWidthChange(Number(event.target.value))}
-          />
-        </label>
-      </div>
+            onClick={() => onFillShapesChange(!fillShapes)}
+          >
+            <PaintBucket size={16} />
+            <span>填充</span>
+          </button>
+          {COLORS.map((color) => (
+            <button
+              key={color}
+              className={clsx('color-swatch', penColor === color && 'active')}
+              type="button"
+              style={{ backgroundColor: color }}
+              onClick={() => onPenColorChange(color)}
+              aria-label={`切换画笔颜色 ${color}`}
+            />
+          ))}
+          <label className="range-control">
+            <span>粗细</span>
+            <input
+              type="range"
+              min="2"
+              max="18"
+              value={penWidth}
+              onChange={(event) => onPenWidthChange(Number(event.target.value))}
+            />
+          </label>
+        </div>
+      ) : null}
 
       <div className="toolbar-group compact">
         <button className="icon-text-button" type="button" onClick={onUndo} disabled={!canUndo} aria-label="撤销">

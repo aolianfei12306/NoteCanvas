@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Settings } from 'lucide-react'
-import { normalizeLibrarySnapshot, createFolder, createNote, deriveNoteTitle, sortFolders, sortNotes, touchNote, type LibrarySnapshot, type NoteRecord, type ToolMode } from '../shared/model'
+import { normalizeLibrarySnapshot, createFolder, createNote, deriveNoteTitle, sortFolders, sortNotes, touchNote, type LibrarySnapshot, type NoteRecord, type PenToolMode, type ToolMode } from '../shared/model'
 import { EditorToolbar } from './components/EditorToolbar'
 import { BoardEditor } from './components/BoardEditor'
 import { Sidebar } from './components/Sidebar'
@@ -32,6 +32,8 @@ function App() {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [tool, setTool] = useState<ToolMode>('browse')
+  const [penTool, setPenTool] = useState<PenToolMode>('freehand')
+  const [fillShapes, setFillShapes] = useState(false)
   const [penColor, setPenColor] = useState(settings.defaultPenColor)
   const [penWidth, setPenWidth] = useState(settings.defaultPenWidth)
   const [activeTextBlockId, setActiveTextBlockId] = useState<string | null>(null)
@@ -160,10 +162,11 @@ function App() {
           pages: stats.pages + 1,
           textBlocks: stats.textBlocks + page.textBlocks.length,
           strokes: stats.strokes + page.strokes.length,
+          shapes: stats.shapes + page.shapes.length,
         }),
-        { pages: 0, textBlocks: 0, strokes: 0 },
+        { pages: 0, textBlocks: 0, strokes: 0, shapes: 0 },
       )
-    : { pages: 0, textBlocks: 0, strokes: 0 }
+    : { pages: 0, textBlocks: 0, strokes: 0, shapes: 0 }
   const currentHistory = selectedNoteId ? historyByNoteRef.current.get(selectedNoteId) : null
   const canUndo = Boolean(currentHistory?.past.length)
   const canRedo = Boolean(currentHistory?.future.length)
@@ -455,6 +458,7 @@ function App() {
             <span>{currentNoteStats.pages} 页</span>
             <span>{currentNoteStats.textBlocks} 个文本块</span>
             <span>{currentNoteStats.strokes} 笔线条</span>
+            <span>{currentNoteStats.shapes} 个图形</span>
             <button className="icon-text-button" type="button" onClick={() => setSettingsOpen(true)}>
               <Settings size={16} />
               <span>设置</span>
@@ -464,6 +468,8 @@ function App() {
 
         <EditorToolbar
           tool={tool}
+          penTool={penTool}
+          fillShapes={fillShapes}
           penColor={penColor}
           penWidth={penWidth}
           saveState={saveState}
@@ -471,6 +477,8 @@ function App() {
           canUndo={canUndo}
           canRedo={canRedo}
           onToolChange={handleToolChange}
+          onPenToolChange={setPenTool}
+          onFillShapesChange={setFillShapes}
           onPenColorChange={setPenColor}
           onPenWidthChange={setPenWidth}
           onFormat={handleFormat}
@@ -483,6 +491,8 @@ function App() {
             key={`${currentNote.id}-${tool === 'export' ? 'export' : 'edit'}`}
             note={currentNote}
             tool={tool}
+            penTool={penTool}
+            fillShapes={fillShapes}
             penColor={penColor}
             penWidth={penWidth}
             activeTextBlockId={activeTextBlockId}

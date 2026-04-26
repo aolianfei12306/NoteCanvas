@@ -1,4 +1,5 @@
 export type ToolMode = 'browse' | 'text' | 'pen' | 'eraser' | 'export'
+export type PenToolMode = 'freehand' | 'line' | 'rectangle' | 'ellipse'
 
 export interface Point {
   x: number
@@ -43,6 +44,22 @@ export interface StrokeRecord {
   createdAt: string
 }
 
+export interface ShapeRecord {
+  id: string
+  layerId: string
+  kind: Exclude<PenToolMode, 'freehand'>
+  x: number
+  y: number
+  width: number
+  height: number
+  strokeColor: string
+  strokeWidth: number
+  strokeOpacity: number
+  fillColor: string | null
+  fillOpacity: number
+  createdAt: string
+}
+
 export interface BoardPageRecord {
   id: string
   width: number
@@ -51,6 +68,7 @@ export interface BoardPageRecord {
   activeLayerId: string
   textBlocks: TextBlockRecord[]
   strokes: StrokeRecord[]
+  shapes: ShapeRecord[]
   createdAt: string
   updatedAt: string
 }
@@ -69,10 +87,11 @@ interface LegacyBoardDocument {
   activePageId?: string
 }
 
-type BoardPageInput = Omit<Partial<BoardPageRecord>, 'layers' | 'textBlocks' | 'strokes'> & {
+type BoardPageInput = Omit<Partial<BoardPageRecord>, 'layers' | 'textBlocks' | 'strokes' | 'shapes'> & {
   layers?: Array<Partial<LayerRecord>>
   textBlocks?: Array<Partial<TextBlockRecord>>
   strokes?: Array<Partial<StrokeRecord>>
+  shapes?: Array<Partial<ShapeRecord>>
 }
 
 export interface FolderRecord {
@@ -177,6 +196,28 @@ function normalizeStroke(stroke: Partial<StrokeRecord>, fallbackLayerId: string)
   }
 }
 
+function normalizeShape(shape: Partial<ShapeRecord>, fallbackLayerId: string): ShapeRecord | null {
+  if (shape.kind !== 'line' && shape.kind !== 'rectangle' && shape.kind !== 'ellipse') {
+    return null
+  }
+
+  return {
+    id: shape.id ?? makeId('shape'),
+    layerId: shape.layerId || fallbackLayerId,
+    kind: shape.kind,
+    x: shape.x ?? 0,
+    y: shape.y ?? 0,
+    width: shape.width ?? 1,
+    height: shape.height ?? 1,
+    strokeColor: shape.strokeColor ?? '#111827',
+    strokeWidth: shape.strokeWidth ?? 4,
+    strokeOpacity: shape.strokeOpacity ?? 1,
+    fillColor: shape.fillColor ?? null,
+    fillOpacity: shape.fillOpacity ?? 0.18,
+    createdAt: shape.createdAt ?? nowIso(),
+  }
+}
+
 export function createBoardPage(partial: BoardPageInput = {}): BoardPageRecord {
   const createdAt = nowIso()
   const layers = Array.isArray(partial.layers) && partial.layers.length > 0
@@ -199,6 +240,12 @@ export function createBoardPage(partial: BoardPageInput = {}): BoardPageRecord {
     strokes: Array.isArray(partial.strokes)
       ? partial.strokes.flatMap((stroke) => {
           const normalized = normalizeStroke(stroke, activeLayerId)
+          return normalized ? [normalized] : []
+        })
+      : [],
+    shapes: Array.isArray(partial.shapes)
+      ? partial.shapes.flatMap((shape) => {
+          const normalized = normalizeShape(shape, activeLayerId)
           return normalized ? [normalized] : []
         })
       : [],

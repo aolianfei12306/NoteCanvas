@@ -26,6 +26,7 @@ describe('createBlankDocument', () => {
     expect(document.pages).toHaveLength(1)
     expect(document.activePageId).toBe(document.pages[0].id)
     expect(document.pages[0].activeLayerId).toBe(document.pages[0].layers[0].id)
+    expect(document.pages[0].shapes).toEqual([])
   })
 })
 
