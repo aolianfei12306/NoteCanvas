@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Copy, Download, LoaderCircle, MousePointer2 } from 'lucide-react'
+import { Copy, Download, LoaderCircle } from 'lucide-react'
 import {
   clampExportRect,
   createTextBlock,
@@ -438,13 +438,6 @@ export function BoardEditor({
               onRemove={removeTextBlock}
             />
           ))}
-
-          {note.document.strokes.length === 0 && note.document.textBlocks.length === 0 ? (
-            <div className="board-empty-state" data-export-ignore="true">
-              <MousePointer2 size={20} />
-              <p>从左上角工具栏切到文本、画笔或框选导出模式开始创作。</p>
-            </div>
-          ) : null}
 
           {selection ? (
             <div
