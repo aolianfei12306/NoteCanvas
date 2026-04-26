@@ -1,58 +1,56 @@
 # Goal
 
-在 `/home/cjdockers/shm/Git/NoteCanvas` 创建一个轻量桌面笔记应用，提供 Apple Notes 风格的文件夹与笔记管理，以及便捷的手绘和区域导出 PNG 拖拽能力。
+完成 `PROMPTS.md` 中列出的修复和新增功能，并修复后续发现的文本块拖动/定位问题。
 
 # Constraints
 
-- 严格遵循用户指定的 `AGENTS.md` 及其关联规范。
-- 第一版必须支持鼠标等指针输入。
-- 区域导出要求能直接拖到文件夹或网页，落地为完整图片。
-- 先做本地离线能力，但为未来同步保留可扩展结构。
+- 遵循仓库中的 `.AGENTS` 工作规范。
+- 保留本地离线数据结构，并兼容旧版单画布工作库。
+- 不覆盖用户未跟踪文件或无关工作区内容。
 
 # Files in Scope
 
-- Electron 主进程与预加载脚本
-- React 前端编辑器与侧边栏
-- 共享数据模型
-- 过程文档、设计文档、ADR、README
+- `shared/model.ts`
+- `src/App.tsx`
+- `src/components/*`
+- `src/lib/*`
+- `src/index.css`
+- `electron/*`
+- `vite.config.ts`
+- `docs/*`
+- 状态和设计文档
 
-# Steps
+# Completed Steps
 
-1. 建立项目级状态文档、计划文档、设计文档与 ADR
-2. 配置 Electron + Vite + React 的桌面应用骨架
-3. 实现共享数据模型和本地工作库读写
-4. 实现文件夹、笔记列表和标题编辑
-5. 实现自由画布文本块、手绘和擦除
-6. 实现区域框选、复制、另存和拖拽 PNG 导出
-7. 运行构建与测试并回写验证结果
-
-# Risks
-
-- Electron 外部拖拽对文件路径和临时文件生成顺序较敏感。
-- `contentEditable` 与 React 状态同步需要避免光标跳动。
-- 区域导出需要排除选择框与编辑手柄等装饰性 UI。
+1. 移除空画布提示。
+2. 简化文本块外框显示逻辑。
+3. 修复 Electron 窗口关闭和开发进程退出链路。
+4. 修复文件夹重命名。
+5. 增加 `Ctrl + 滚轮` 画布缩放。
+6. 增加多页模型和加页控件。
+7. 增加图层模型和图层控件。
+8. 增加设置面板。
+9. 增加笔记级 Undo/Redo。
+10. 增加几何图形画笔子工具。
+11. 增加 Apple Notes 风格调色控件。
+12. 将画笔子工具和调色控件限制在画笔模式下方显示。
+13. 恢复因编码问题变成问号的中文文案。
+14. 修复文本块激活态文字位置跳变和缩放拖动瞬移。
+15. 新增 `docs/IMPROVEMENTS.md` 记录后续改进建议。
 
 # Verification
 
-- `npm run build`
 - `npm run test`
-- 如开发环境允许，再以 `npm run dev` 做人工交互验证
+- `npm run lint`
+- `npm run build`
+
+# Remaining Manual Checks
+
+- 在真实 Electron 窗口中验证文本块拖动、缩放拖动、关闭窗口退出、拖出 PNG、图层显隐/锁定、设置面板和导出入口。
 
 # Out of Scope
 
-- 云同步
-- OCR / 搜索 / 标签
-- 移动端适配
-- 多人协作
-
-
-# 2026-04-26 Completion Notes
-
-## Completed
-
-- ??????????????? `PROMPTS.md` ????????????
-- ????????`npm run test`?`npm run lint`?`npm run build` ????
-
-## Remaining Manual Checks
-
-- ????? Electron ????????? PNG????????????/???Ctrl+????????????
+- 云同步。
+- OCR / 搜索 / 标签。
+- 多人协作。
+- 移动端适配。
