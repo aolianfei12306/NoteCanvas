@@ -36,6 +36,7 @@ function App() {
   const [fillShapes, setFillShapes] = useState(false)
   const [penColor, setPenColor] = useState(settings.defaultPenColor)
   const [penWidth, setPenWidth] = useState(settings.defaultPenWidth)
+  const [penOpacity, setPenOpacity] = useState(1)
   const [activeTextBlockId, setActiveTextBlockId] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -472,6 +473,7 @@ function App() {
           fillShapes={fillShapes}
           penColor={penColor}
           penWidth={penWidth}
+          penOpacity={penOpacity}
           saveState={saveState}
           canFormatText={Boolean(activeTextBlockId)}
           canUndo={canUndo}
@@ -481,6 +483,7 @@ function App() {
           onFillShapesChange={setFillShapes}
           onPenColorChange={setPenColor}
           onPenWidthChange={setPenWidth}
+          onPenOpacityChange={setPenOpacity}
           onFormat={handleFormat}
           onUndo={handleUndo}
           onRedo={handleRedo}
@@ -495,6 +498,7 @@ function App() {
             fillShapes={fillShapes}
             penColor={penColor}
             penWidth={penWidth}
+            penOpacity={penOpacity}
             activeTextBlockId={activeTextBlockId}
             onActiveTextBlockChange={setActiveTextBlockId}
             onNoteChange={handleCurrentNoteChange}

@@ -9,6 +9,7 @@ import {
   Minus,
   MousePointer2,
   PaintBucket,
+  Palette,
   Pencil,
   Redo2,
   Square,
@@ -24,6 +25,7 @@ interface EditorToolbarProps {
   fillShapes: boolean
   penColor: string
   penWidth: number
+  penOpacity: number
   saveState: 'idle' | 'saving' | 'saved' | 'error'
   canFormatText: boolean
   canUndo: boolean
@@ -33,12 +35,24 @@ interface EditorToolbarProps {
   onFillShapesChange: (fill: boolean) => void
   onPenColorChange: (color: string) => void
   onPenWidthChange: (width: number) => void
+  onPenOpacityChange: (opacity: number) => void
   onFormat: (command: TextFormatCommand) => void
   onUndo: () => void
   onRedo: () => void
 }
 
-const COLORS = ['#111827', '#1d4ed8', '#9333ea', '#dc2626', '#059669']
+const COLORS = [
+  '#111827',
+  '#6b7280',
+  '#ef4444',
+  '#f97316',
+  '#eab308',
+  '#22c55e',
+  '#14b8a6',
+  '#3b82f6',
+  '#8b5cf6',
+  '#ec4899',
+]
 
 const PEN_TOOL_ITEMS: Array<{
   key: PenToolMode
@@ -82,6 +96,7 @@ export function EditorToolbar({
   fillShapes,
   penColor,
   penWidth,
+  penOpacity,
   saveState,
   canFormatText,
   canUndo,
@@ -91,6 +106,7 @@ export function EditorToolbar({
   onFillShapesChange,
   onPenColorChange,
   onPenWidthChange,
+  onPenOpacityChange,
   onFormat,
   onUndo,
   onRedo,
@@ -150,6 +166,14 @@ export function EditorToolbar({
               aria-label={`切换画笔颜色 ${color}`}
             />
           ))}
+          <label className="custom-color-control" aria-label="自定义画笔颜色">
+            <Palette size={16} />
+            <input
+              type="color"
+              value={penColor}
+              onChange={(event) => onPenColorChange(event.target.value)}
+            />
+          </label>
           <label className="range-control">
             <span>粗细</span>
             <input
@@ -158,6 +182,17 @@ export function EditorToolbar({
               max="18"
               value={penWidth}
               onChange={(event) => onPenWidthChange(Number(event.target.value))}
+            />
+          </label>
+          <label className="range-control">
+            <span>透明</span>
+            <input
+              type="range"
+              min="0.2"
+              max="1"
+              step="0.05"
+              value={penOpacity}
+              onChange={(event) => onPenOpacityChange(Number(event.target.value))}
             />
           </label>
         </div>

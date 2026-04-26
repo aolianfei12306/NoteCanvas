@@ -39,6 +39,7 @@ interface BoardEditorProps {
   fillShapes: boolean
   penColor: string
   penWidth: number
+  penOpacity: number
   activeTextBlockId: string | null
   onActiveTextBlockChange: (blockId: string | null) => void
   onNoteChange: (nextNote: NoteRecord) => void
@@ -62,13 +63,13 @@ function pointsToPath(points: Point[]) {
   }, '')
 }
 
-function buildStroke(points: Point[], color: string, width: number, layerId: string): StrokeRecord {
+function buildStroke(points: Point[], color: string, width: number, opacity: number, layerId: string): StrokeRecord {
   return {
     id: `stroke_${crypto.randomUUID()}`,
     layerId,
     color,
     width,
-    opacity: 1,
+    opacity,
     points,
     createdAt: new Date().toISOString(),
   }
@@ -80,6 +81,7 @@ function buildShape(
   kind: Exclude<PenToolMode, 'freehand'>,
   color: string,
   width: number,
+  opacity: number,
   fillShapes: boolean,
   layerId: string,
 ): ShapeRecord {
@@ -95,9 +97,9 @@ function buildShape(
     height: isLine ? point.y - origin.y : Math.abs(point.y - origin.y),
     strokeColor: color,
     strokeWidth: width,
-    strokeOpacity: 1,
+    strokeOpacity: opacity,
     fillColor: fillShapes && !isLine ? color : null,
-    fillOpacity: 0.18,
+    fillOpacity: fillShapes && !isLine ? Math.max(0.08, opacity * 0.22) : 0,
     createdAt: new Date().toISOString(),
   }
 }
@@ -192,6 +194,7 @@ export function BoardEditor({
   fillShapes,
   penColor,
   penWidth,
+  penOpacity,
   activeTextBlockId,
   onActiveTextBlockChange,
   onNoteChange,
@@ -521,7 +524,7 @@ export function BoardEditor({
       if (penTool !== 'freehand') {
         pointerModeRef.current = 'shape'
         shapeOriginRef.current = point
-        setDraftShape(buildShape(point, point, penTool, penColor, penWidth, fillShapes, page.activeLayerId))
+        setDraftShape(buildShape(point, point, penTool, penColor, penWidth, penOpacity, fillShapes, page.activeLayerId))
         event.currentTarget.setPointerCapture(event.pointerId)
         return
       }
@@ -567,7 +570,7 @@ export function BoardEditor({
     }
 
     if (pointerModeRef.current === 'shape' && shapeOriginRef.current && penTool !== 'freehand') {
-      setDraftShape(buildShape(shapeOriginRef.current, point, penTool, penColor, penWidth, fillShapes, page.activeLayerId))
+      setDraftShape(buildShape(shapeOriginRef.current, point, penTool, penColor, penWidth, penOpacity, fillShapes, page.activeLayerId))
       return
     }
 
@@ -598,7 +601,7 @@ export function BoardEditor({
     const page = pages.find((candidate) => candidate.id === pointerPageIdRef.current)
 
     if (page && pointerModeRef.current === 'draw' && draftPointsRef.current.length > 1) {
-      const nextStroke = buildStroke(draftPointsRef.current, penColor, penWidth, page.activeLayerId)
+      const nextStroke = buildStroke(draftPointsRef.current, penColor, penWidth, penOpacity, page.activeLayerId)
       updatePage(page.id, (currentPage) => ({
         ...currentPage,
         strokes: [...currentPage.strokes, nextStroke],
