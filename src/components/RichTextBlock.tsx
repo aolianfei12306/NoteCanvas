@@ -22,6 +22,7 @@ export function RichTextBlock({
   onRemove,
 }: RichTextBlockProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
+  const canEdit = interactive && active
 
   useEffect(() => {
     if (!editorRef.current) {
@@ -39,8 +40,8 @@ export function RichTextBlock({
       className={clsx('text-block-shell', active && 'active', !interactive && 'readonly')}
       size={{ width: block.width, height: block.height }}
       position={{ x: block.x, y: block.y }}
-      disableDragging={!interactive}
-      enableResizing={interactive}
+      disableDragging={!canEdit}
+      enableResizing={canEdit}
       dragHandleClassName="text-block-drag-handle"
       cancel=".text-block-editor,button"
       onDragStart={() => onActivate(block.id)}
@@ -63,36 +64,46 @@ export function RichTextBlock({
         })
       }
     >
-      <div className="text-block-card" onMouseDown={() => onActivate(block.id)}>
-        <div className="text-block-header" data-export-ignore="true">
-          <div className="text-block-drag-handle">
-            <GripVertical size={14} />
-            <span>文本块</span>
+      <div className="text-block-card" onMouseDown={() => interactive && onActivate(block.id)}>
+        {canEdit ? (
+          <div className="text-block-header" data-export-ignore="true">
+            <div className="text-block-drag-handle">
+              <GripVertical size={14} />
+              <span>文本块</span>
+            </div>
+            <button
+              className="icon-button subtle"
+              data-export-ignore="true"
+              type="button"
+              onClick={() => onRemove(block.id)}
+            >
+              <X size={14} />
+            </button>
           </div>
-          <button
-            className="icon-button subtle"
-            data-export-ignore="true"
-            type="button"
-            onClick={() => onRemove(block.id)}
-          >
-            <X size={14} />
-          </button>
-        </div>
+        ) : null}
 
         <div
           ref={editorRef}
           className="text-block-editor"
-          contentEditable={interactive}
+          contentEditable={canEdit}
           suppressContentEditableWarning
-          onFocus={() => onActivate(block.id)}
-          onMouseDown={(event) => event.stopPropagation()}
-          onInput={(event) =>
+          onFocus={() => interactive && onActivate(block.id)}
+          onMouseDown={(event) => {
+            if (canEdit) {
+              event.stopPropagation()
+            }
+          }}
+          onInput={(event) => {
+            if (!canEdit) {
+              return
+            }
+
             onChange({
               ...block,
               html: event.currentTarget.innerHTML,
               updatedAt: new Date().toISOString(),
             })
-          }
+          }}
         />
       </div>
     </Rnd>
