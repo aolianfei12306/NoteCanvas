@@ -48,17 +48,29 @@ async function startElectronProcess() {
 
     const electronPath = require('electron') as string
 
-    electronApp = spawn(electronPath, ['.', '--no-sandbox'], {
+    const nextElectronApp = spawn(electronPath, ['.', '--no-sandbox'], {
       stdio: 'inherit',
       cwd: rootDir,
     })
+    electronApp = nextElectronApp
 
-    electronApp.once('error', (error) => {
+    nextElectronApp.once('error', (error) => {
       console.error('[electron] spawn failed:', error)
     })
 
-    electronApp.once('exit', () => {
-      electronApp = null
+    nextElectronApp.once('exit', (code) => {
+      if (electronApp === nextElectronApp) {
+        electronApp = null
+      }
+
+      if (!shuttingDown) {
+        shuttingDown = true
+        if (restartTimer) {
+          clearTimeout(restartTimer)
+          restartTimer = null
+        }
+        process.exit(code ?? 0)
+      }
     })
   })()
 
