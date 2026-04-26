@@ -20,6 +20,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const workspacePath = path.join(app.getPath('userData'), 'workspace')
 const libraryPath = path.join(workspacePath, 'library.json')
 const dragExportPath = path.join(app.getPath('temp'), 'note-canvas-exports')
+const hasSingleInstanceLock = app.requestSingleInstanceLock()
+
+if (!hasSingleInstanceLock) {
+  app.quit()
+}
 
 async function ensureDirectory(targetPath: string) {
   await fs.mkdir(targetPath, { recursive: true })
@@ -72,7 +77,7 @@ function createMainWindow() {
     backgroundColor: '#f4ede3',
     title: 'NoteCanvas',
     webPreferences: {
-      preload: path.join(__dirname, '../preload/preload.mjs'),
+      preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       sandbox: false,
     },
@@ -87,22 +92,35 @@ function createMainWindow() {
   return window
 }
 
-app.whenReady().then(async () => {
-  await ensureDirectory(dragExportPath)
-  await loadLibrary()
-  createMainWindow()
+if (hasSingleInstanceLock) {
+  app.whenReady().then(async () => {
+    await ensureDirectory(dragExportPath)
+    await loadLibrary()
+    createMainWindow()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow()
-    }
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createMainWindow()
+      }
+    })
   })
-})
+
+  app.on('second-instance', () => {
+    const existing = BrowserWindow.getAllWindows()[0]
+    if (!existing) {
+      return
+    }
+
+    if (existing.isMinimized()) {
+      existing.restore()
+    }
+
+    existing.focus()
+  })
+}
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  app.quit()
 })
 
 process.on('message', (message) => {

@@ -20,7 +20,12 @@ function App() {
   useEffect(() => {
     async function bootstrap() {
       try {
-        const loaded = normalizeLibrarySnapshot(await window.noteCanvas.loadLibrary())
+        const bridge = window.noteCanvas
+        if (!bridge || typeof bridge.loadLibrary !== 'function') {
+          throw new Error('桌面桥接未加载，请先关闭所有 npm run dev 进程后重启。')
+        }
+
+        const loaded = normalizeLibrarySnapshot(await bridge.loadLibrary())
         setLibrary(loaded)
         setSelectedFolderId(loaded.notes.find((note) => note.id === loaded.lastOpenedNoteId)?.folderId ?? loaded.folders[0]?.id ?? null)
         setSelectedNoteId(loaded.lastOpenedNoteId ?? loaded.notes[0]?.id ?? null)
