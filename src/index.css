@@ -411,6 +411,16 @@ button {
   gap: 10px;
 }
 
+.board-page-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 8px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
 .board-stage {
   flex: 1;
   min-height: 0;
@@ -420,6 +430,39 @@ button {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.15)),
     rgba(223, 211, 194, 0.45);
+}
+
+.board-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.board-page-shell {
+  width: max-content;
+}
+
+.board-page-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.board-page-meta button {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  color: #6b7280;
+  padding: 6px 10px;
+}
+
+.board-page-shell.active .board-page-meta button {
+  background: #fff8ec;
+  color: #a16207;
 }
 
 .board-zoom-frame {

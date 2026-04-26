@@ -97,6 +97,16 @@ function App() {
 
   const currentFolderName =
     folders.find((folder) => folder.id === (currentNote?.folderId ?? selectedFolderId))?.name ?? '未分组'
+  const currentNoteStats = currentNote
+    ? currentNote.document.pages.reduce(
+        (stats, page) => ({
+          pages: stats.pages + 1,
+          textBlocks: stats.textBlocks + page.textBlocks.length,
+          strokes: stats.strokes + page.strokes.length,
+        }),
+        { pages: 0, textBlocks: 0, strokes: 0 },
+      )
+    : { pages: 0, textBlocks: 0, strokes: 0 }
 
   function updateLibrary(transformer: (previous: LibrarySnapshot) => LibrarySnapshot) {
     setLibrary((previous) => {
@@ -322,8 +332,9 @@ function App() {
           </div>
           <div className="header-summary">
             <span>{notesInSelectedFolder.length} 条笔记</span>
-            <span>{currentNote?.document.textBlocks.length ?? 0} 个文本块</span>
-            <span>{currentNote?.document.strokes.length ?? 0} 笔线条</span>
+            <span>{currentNoteStats.pages} 页</span>
+            <span>{currentNoteStats.textBlocks} 个文本块</span>
+            <span>{currentNoteStats.strokes} 笔线条</span>
           </div>
         </header>
 

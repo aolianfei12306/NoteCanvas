@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   clampExportRect,
+  createBlankDocument,
   createDefaultLibrary,
   normalizeLibrarySnapshot,
   sanitizeFileName,
@@ -13,6 +14,16 @@ describe('createDefaultLibrary', () => {
     expect(snapshot.folders.length).toBeGreaterThanOrEqual(2)
     expect(snapshot.notes).toHaveLength(1)
     expect(snapshot.lastOpenedNoteId).toBe(snapshot.notes[0].id)
+    expect(snapshot.notes[0].document.pages).toHaveLength(1)
+  })
+})
+
+describe('createBlankDocument', () => {
+  it('creates one active page', () => {
+    const document = createBlankDocument()
+
+    expect(document.pages).toHaveLength(1)
+    expect(document.activePageId).toBe(document.pages[0].id)
   })
 })
 
@@ -33,6 +44,40 @@ describe('normalizeLibrarySnapshot', () => {
 
     expect(normalized.notes).toHaveLength(1)
     expect(normalized.notes[0].folderId).toBe('folder_1')
+  })
+
+  it('migrates a legacy single-board document into one page', () => {
+    const normalized = normalizeLibrarySnapshot({
+      folders: [
+        {
+          id: 'folder_1',
+          name: 'Only Folder',
+          parentId: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+      notes: [
+        {
+          id: 'note_1',
+          folderId: 'folder_1',
+          title: 'Legacy',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          revision: 1,
+          document: {
+            width: 300,
+            height: 400,
+            textBlocks: [],
+            strokes: [],
+          } as never,
+        },
+      ],
+    })
+
+    expect(normalized.notes[0].document.pages).toHaveLength(1)
+    expect(normalized.notes[0].document.pages[0].width).toBe(300)
+    expect(normalized.notes[0].document.pages[0].height).toBe(400)
   })
 })
 

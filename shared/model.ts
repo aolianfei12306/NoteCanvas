@@ -32,11 +32,28 @@ export interface StrokeRecord {
   createdAt: string
 }
 
-export interface BoardDocument {
+export interface BoardPageRecord {
+  id: string
   width: number
   height: number
   textBlocks: TextBlockRecord[]
   strokes: StrokeRecord[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BoardDocument {
+  pages: BoardPageRecord[]
+  activePageId: string
+}
+
+interface LegacyBoardDocument {
+  width?: number
+  height?: number
+  textBlocks?: TextBlockRecord[]
+  strokes?: StrokeRecord[]
+  pages?: Partial<BoardPageRecord>[]
+  activePageId?: string
 }
 
 export interface FolderRecord {
@@ -65,9 +82,9 @@ export interface LibrarySnapshot {
 }
 
 const SCHEMA_VERSION = 1
-const DEFAULT_BOARD_WIDTH = 1440
-const DEFAULT_BOARD_HEIGHT = 1800
-const UNTITLED_NOTE = '未命名笔记'
+export const DEFAULT_BOARD_WIDTH = 1440
+export const DEFAULT_BOARD_HEIGHT = 1800
+const UNTITLED_NOTE = '?????'
 
 function nowIso() {
   return new Date().toISOString()
@@ -77,7 +94,7 @@ function makeId(prefix: string) {
   return `${prefix}_${crypto.randomUUID()}`
 }
 
-export function createFolder(name = '新建文件夹', parentId: string | null = null): FolderRecord {
+export function createFolder(name = '?????', parentId: string | null = null): FolderRecord {
   const createdAt = nowIso()
 
   return {
@@ -98,34 +115,53 @@ export function createTextBlock(partial: Partial<TextBlockRecord> = {}): TextBlo
     y: partial.y ?? 120,
     width: partial.width ?? 520,
     height: partial.height ?? 180,
-    html: partial.html ?? '<h1>新建笔记</h1><p>在这里输入文字，或切到画笔开始写写画画。</p>',
+    html: partial.html ?? '<h1>????</h1><p>????????????????????</p>',
+    createdAt: partial.createdAt ?? createdAt,
+    updatedAt: partial.updatedAt ?? createdAt,
+  }
+}
+
+export function createBoardPage(partial: Partial<BoardPageRecord> = {}): BoardPageRecord {
+  const createdAt = nowIso()
+
+  return {
+    id: partial.id ?? makeId('page'),
+    width: partial.width ?? DEFAULT_BOARD_WIDTH,
+    height: partial.height ?? DEFAULT_BOARD_HEIGHT,
+    textBlocks: Array.isArray(partial.textBlocks) ? partial.textBlocks : [],
+    strokes: Array.isArray(partial.strokes) ? partial.strokes : [],
     createdAt: partial.createdAt ?? createdAt,
     updatedAt: partial.updatedAt ?? createdAt,
   }
 }
 
 export function createBlankDocument(): BoardDocument {
+  const page = createBoardPage()
+
   return {
-    width: DEFAULT_BOARD_WIDTH,
-    height: DEFAULT_BOARD_HEIGHT,
-    textBlocks: [],
-    strokes: [],
+    pages: [page],
+    activePageId: page.id,
   }
+}
+
+export function getActivePage(document: BoardDocument) {
+  return document.pages.find((page) => page.id === document.activePageId) ?? document.pages[0]
 }
 
 export function createNote(folderId: string, title = UNTITLED_NOTE, withStarterContent = false): NoteRecord {
   const createdAt = nowIso()
   const document = createBlankDocument()
+  const firstPage = document.pages[0]
 
   if (withStarterContent) {
-    document.textBlocks.push(
+    firstPage.textBlocks.push(
       createTextBlock({
         x: 96,
         y: 96,
         width: 620,
         height: 240,
         html:
-          '<h1>欢迎使用 NoteCanvas</h1><p>这里适合快速记事、写草图和圈选区域导出 PNG。</p><ul><li>文本工具：新建可拖拽文本块</li><li>画笔工具：直接用鼠标写写画画</li><li>导出工具：框选后可复制、另存或拖出图片</li></ul>',
+          '<h1>???? NoteCanvas</h1><p>??????????????????? PNG?</p><ul><li>?????????????</li><li>??????????????</li><li>???????????????????</li></ul>',
       }),
     )
   }
@@ -177,7 +213,7 @@ export function deriveNoteTitle(note: NoteRecord) {
     return cleaned
   }
 
-  const firstBlock = note.document.textBlocks[0]
+  const firstBlock = note.document.pages.flatMap((page) => page.textBlocks)[0]
   if (!firstBlock) {
     return UNTITLED_NOTE
   }
@@ -211,15 +247,52 @@ export function sanitizeFileName(input: string) {
 }
 
 export function createDefaultLibrary(): LibrarySnapshot {
-  const inbox = createFolder('收件箱')
-  const ideas = createFolder('灵感池')
-  const welcome = createNote(inbox.id, '欢迎使用 NoteCanvas', true)
+  const inbox = createFolder('???')
+  const ideas = createFolder('???')
+  const welcome = createNote(inbox.id, '???? NoteCanvas', true)
 
   return {
     schemaVersion: SCHEMA_VERSION,
     lastOpenedNoteId: welcome.id,
     folders: sortFolders([inbox, ideas]),
     notes: sortNotes([welcome]),
+  }
+}
+
+function normalizeDocument(document: LegacyBoardDocument | null | undefined): BoardDocument {
+  if (Array.isArray(document?.pages) && document.pages.length > 0) {
+    const pages = document.pages.map((page) =>
+      createBoardPage({
+        id: page.id,
+        width: page.width || DEFAULT_BOARD_WIDTH,
+        height: page.height || DEFAULT_BOARD_HEIGHT,
+        textBlocks: Array.isArray(page.textBlocks) ? page.textBlocks : [],
+        strokes: Array.isArray(page.strokes) ? page.strokes : [],
+        createdAt: page.createdAt,
+        updatedAt: page.updatedAt,
+      }),
+    )
+    const pageIds = new Set(pages.map((page) => page.id))
+    const activePageId = document.activePageId && pageIds.has(document.activePageId)
+      ? document.activePageId
+      : pages[0].id
+
+    return {
+      pages,
+      activePageId,
+    }
+  }
+
+  const page = createBoardPage({
+    width: document?.width || DEFAULT_BOARD_WIDTH,
+    height: document?.height || DEFAULT_BOARD_HEIGHT,
+    textBlocks: Array.isArray(document?.textBlocks) ? document.textBlocks : [],
+    strokes: Array.isArray(document?.strokes) ? document.strokes : [],
+  })
+
+  return {
+    pages: [page],
+    activePageId: page.id,
   }
 }
 
@@ -260,12 +333,7 @@ export function normalizeLibrarySnapshot(snapshot: Partial<LibrarySnapshot> | nu
       folderId: allowedFolderIds.has(note.folderId) ? note.folderId : fallbackFolderId,
       title: note.title?.trim() || UNTITLED_NOTE,
       revision: Math.max(note.revision ?? 1, 1),
-      document: {
-        width: note.document.width || DEFAULT_BOARD_WIDTH,
-        height: note.document.height || DEFAULT_BOARD_HEIGHT,
-        textBlocks: Array.isArray(note.document.textBlocks) ? note.document.textBlocks : [],
-        strokes: Array.isArray(note.document.strokes) ? note.document.strokes : [],
-      },
+      document: normalizeDocument(note.document as LegacyBoardDocument),
     }
   })
 

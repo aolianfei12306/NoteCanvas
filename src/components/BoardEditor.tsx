@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Copy, Download, LoaderCircle } from 'lucide-react'
+import { Copy, Download, LoaderCircle, Plus } from 'lucide-react'
 import {
   clampExportRect,
+  createBoardPage,
   createTextBlock,
+  getActivePage,
   touchNote,
+  type BoardPageRecord,
   type ExportRect,
   type NoteRecord,
   type Point,
@@ -22,6 +25,10 @@ interface BoardEditorProps {
   activeTextBlockId: string | null
   onActiveTextBlockChange: (blockId: string | null) => void
   onNoteChange: (nextNote: NoteRecord) => void
+}
+
+interface BoardSelection extends ExportRect {
+  pageId: string
 }
 
 function pointsToPath(points: Point[]) {
@@ -67,20 +74,23 @@ export function BoardEditor({
   onNoteChange,
 }: BoardEditorProps) {
   const stageRef = useRef<HTMLDivElement | null>(null)
-  const boardRef = useRef<HTMLDivElement | null>(null)
+  const pageRefs = useRef(new Map<string, HTMLDivElement>())
   const draftPointsRef = useRef<Point[]>([])
   const pointerModeRef = useRef<'draw' | 'erase' | 'select' | null>(null)
-  const selectionOriginRef = useRef<Point | null>(null)
+  const pointerPageIdRef = useRef<string | null>(null)
+  const selectionOriginRef = useRef<{ pageId: string; point: Point } | null>(null)
   const exportCacheRef = useRef<{ key: string; dataUrl: string } | null>(null)
 
   const [draftPoints, setDraftPoints] = useState<Point[]>([])
-  const [selection, setSelection] = useState<ExportRect | null>(null)
+  const [selection, setSelection] = useState<BoardSelection | null>(null)
   const [dragPath, setDragPath] = useState<string | null>(null)
   const [dragLoading, setDragLoading] = useState(false)
   const [exportMessage, setExportMessage] = useState<string | null>(null)
   const [exportBusy, setExportBusy] = useState<'copy' | 'save' | null>(null)
   const [zoom, setZoom] = useState(1)
 
+  const pages = note.document.pages
+  const activePage = getActivePage(note.document)
   const canEditText = tool === 'browse' || tool === 'text'
 
   const selectionKey = useMemo(() => {
@@ -88,7 +98,7 @@ export function BoardEditor({
       return null
     }
 
-    return `${selection.x}-${selection.y}-${selection.width}-${selection.height}-${note.revision}`
+    return `${selection.pageId}-${selection.x}-${selection.y}-${selection.width}-${selection.height}-${note.revision}`
   }, [selection, note.revision])
 
   function commit(nextNote: NoteRecord) {
@@ -107,20 +117,62 @@ export function BoardEditor({
     )
   }
 
-  function getBoardPoint(event: React.PointerEvent | PointerEvent): Point | null {
-    if (!boardRef.current) {
+  function updatePage(
+    pageId: string,
+    updater: (page: BoardPageRecord) => BoardPageRecord,
+  ) {
+    updateDocument((document) => ({
+      ...document,
+      activePageId: pageId,
+      pages: document.pages.map((page) =>
+        page.id === pageId
+          ? {
+              ...updater(page),
+              updatedAt: new Date().toISOString(),
+            }
+          : page,
+      ),
+    }))
+  }
+
+  function setActivePage(pageId: string) {
+    if (pageId === note.document.activePageId) {
+      return
+    }
+
+    updateDocument((document) => ({
+      ...document,
+      activePageId: pageId,
+    }))
+  }
+
+  function addPage() {
+    const page = createBoardPage()
+
+    updateDocument((document) => ({
+      ...document,
+      pages: [...document.pages, page],
+      activePageId: page.id,
+    }))
+    onActiveTextBlockChange(null)
+    setSelection(null)
+  }
+
+  function getBoardPoint(event: React.PointerEvent | PointerEvent, page: BoardPageRecord): Point | null {
+    const pageElement = pageRefs.current.get(page.id)
+    if (!pageElement) {
       return null
     }
 
-    const bounds = boardRef.current.getBoundingClientRect()
-    const scaleX = note.document.width / bounds.width
-    const scaleY = note.document.height / bounds.height
+    const bounds = pageElement.getBoundingClientRect()
+    const scaleX = page.width / bounds.width
+    const scaleY = page.height / bounds.height
     const x = (event.clientX - bounds.left) * scaleX
     const y = (event.clientY - bounds.top) * scaleY
 
     return {
-      x: Math.max(0, Math.min(x, note.document.width)),
-      y: Math.max(0, Math.min(y, note.document.height)),
+      x: Math.max(0, Math.min(x, page.width)),
+      y: Math.max(0, Math.min(y, page.height)),
     }
   }
 
@@ -160,7 +212,10 @@ export function BoardEditor({
   function removeTextBlock(blockId: string) {
     updateDocument((document) => ({
       ...document,
-      textBlocks: document.textBlocks.filter((block) => block.id !== blockId),
+      pages: document.pages.map((page) => ({
+        ...page,
+        textBlocks: page.textBlocks.filter((block) => block.id !== blockId),
+      })),
     }))
 
     if (activeTextBlockId === blockId) {
@@ -168,24 +223,26 @@ export function BoardEditor({
     }
   }
 
-  function eraseAt(point: Point) {
-    if (!note.document.strokes.some((stroke) => hitStroke(point, stroke))) {
+  function eraseAt(page: BoardPageRecord, point: Point) {
+    if (!page.strokes.some((stroke) => hitStroke(point, stroke))) {
       return
     }
 
-    updateDocument((document) => ({
-      ...document,
-      strokes: document.strokes.filter((stroke) => !hitStroke(point, stroke)),
+    updatePage(page.id, (currentPage) => ({
+      ...currentPage,
+      strokes: currentPage.strokes.filter((stroke) => !hitStroke(point, stroke)),
     }))
   }
 
-  function handleBoardPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+  function handleBoardPointerDown(event: React.PointerEvent<HTMLDivElement>, page: BoardPageRecord) {
+    setActivePage(page.id)
+
     if (tool === 'text') {
       if (event.target !== event.currentTarget) {
         return
       }
 
-      const point = getBoardPoint(event)
+      const point = getBoardPoint(event, page)
       if (!point) {
         return
       }
@@ -195,12 +252,12 @@ export function BoardEditor({
         y: point.y,
         width: 420,
         height: 180,
-        html: '<p>输入文字…</p>',
+        html: '<p>?????</p>',
       })
 
-      updateDocument((document) => ({
-        ...document,
-        textBlocks: [...document.textBlocks, block],
+      updatePage(page.id, (currentPage) => ({
+        ...currentPage,
+        textBlocks: [...currentPage.textBlocks, block],
       }))
       onActiveTextBlockChange(block.id)
       return
@@ -211,11 +268,14 @@ export function BoardEditor({
     }
   }
 
-  function handleOverlayPointerDown(event: React.PointerEvent<SVGSVGElement>) {
-    const point = getBoardPoint(event)
+  function handleOverlayPointerDown(event: React.PointerEvent<SVGSVGElement>, page: BoardPageRecord) {
+    const point = getBoardPoint(event, page)
     if (!point) {
       return
     }
+
+    setActivePage(page.id)
+    pointerPageIdRef.current = page.id
 
     if (tool === 'pen') {
       pointerModeRef.current = 'draw'
@@ -227,15 +287,16 @@ export function BoardEditor({
 
     if (tool === 'eraser') {
       pointerModeRef.current = 'erase'
-      eraseAt(point)
+      eraseAt(page, point)
       event.currentTarget.setPointerCapture(event.pointerId)
       return
     }
 
     if (tool === 'export') {
       pointerModeRef.current = 'select'
-      selectionOriginRef.current = point
+      selectionOriginRef.current = { pageId: page.id, point }
       setSelection({
+        pageId: page.id,
         x: point.x,
         y: point.y,
         width: 1,
@@ -245,9 +306,9 @@ export function BoardEditor({
     }
   }
 
-  function handleOverlayPointerMove(event: React.PointerEvent<SVGSVGElement>) {
-    const point = getBoardPoint(event)
-    if (!point || !pointerModeRef.current) {
+  function handleOverlayPointerMove(event: React.PointerEvent<SVGSVGElement>, page: BoardPageRecord) {
+    const point = getBoardPoint(event, page)
+    if (!point || !pointerModeRef.current || pointerPageIdRef.current !== page.id) {
       return
     }
 
@@ -258,33 +319,36 @@ export function BoardEditor({
     }
 
     if (pointerModeRef.current === 'erase') {
-      eraseAt(point)
+      eraseAt(page, point)
       return
     }
 
-    if (pointerModeRef.current === 'select' && selectionOriginRef.current) {
-      const origin = selectionOriginRef.current
-      setSelection(
-        clampExportRect(
+    if (pointerModeRef.current === 'select' && selectionOriginRef.current?.pageId === page.id) {
+      const origin = selectionOriginRef.current.point
+      setSelection({
+        pageId: page.id,
+        ...clampExportRect(
           {
             x: Math.min(origin.x, point.x),
             y: Math.min(origin.y, point.y),
             width: Math.abs(point.x - origin.x),
             height: Math.abs(point.y - origin.y),
           },
-          note.document.width,
-          note.document.height,
+          page.width,
+          page.height,
         ),
-      )
+      })
     }
   }
 
   function handleOverlayPointerUp() {
-    if (pointerModeRef.current === 'draw' && draftPointsRef.current.length > 1) {
+    const page = pages.find((candidate) => candidate.id === pointerPageIdRef.current)
+
+    if (page && pointerModeRef.current === 'draw' && draftPointsRef.current.length > 1) {
       const nextStroke = buildStroke(draftPointsRef.current, penColor, penWidth)
-      updateDocument((document) => ({
-        ...document,
-        strokes: [...document.strokes, nextStroke],
+      updatePage(page.id, (currentPage) => ({
+        ...currentPage,
+        strokes: [...currentPage.strokes, nextStroke],
       }))
     }
 
@@ -297,19 +361,25 @@ export function BoardEditor({
     draftPointsRef.current = []
     selectionOriginRef.current = null
     pointerModeRef.current = null
+    pointerPageIdRef.current = null
     setDraftPoints([])
   }
 
   async function getSelectionDataUrl() {
-    if (!boardRef.current || !selection || !selectionKey) {
-      throw new Error('当前没有可导出的区域')
+    if (!selection || !selectionKey) {
+      throw new Error('??????????')
+    }
+
+    const pageElement = pageRefs.current.get(selection.pageId)
+    if (!pageElement) {
+      throw new Error('???????')
     }
 
     if (exportCacheRef.current?.key === selectionKey) {
       return exportCacheRef.current.dataUrl
     }
 
-    const dataUrl = await captureSelection(boardRef.current, selection)
+    const dataUrl = await captureSelection(pageElement, selection)
     exportCacheRef.current = {
       key: selectionKey,
       dataUrl,
@@ -329,14 +399,15 @@ export function BoardEditor({
     async function prepareDragImage() {
       try {
         setDragLoading(true)
-        if (!boardRef.current) {
-          throw new Error('画布尚未准备好')
+        const pageElement = pageRefs.current.get(activeSelection.pageId)
+        if (!pageElement) {
+          throw new Error('???????')
         }
 
         const dataUrl =
           exportCacheRef.current?.key === currentSelectionKey
             ? exportCacheRef.current.dataUrl
-            : await captureSelection(boardRef.current, activeSelection)
+            : await captureSelection(pageElement, activeSelection)
 
         exportCacheRef.current = {
           key: currentSelectionKey,
@@ -353,7 +424,7 @@ export function BoardEditor({
         }
       } catch (error) {
         if (!cancelled) {
-          setExportMessage(error instanceof Error ? error.message : '拖拽预处理失败')
+          setExportMessage(error instanceof Error ? error.message : '???????')
         }
       } finally {
         if (!cancelled) {
@@ -374,9 +445,9 @@ export function BoardEditor({
       setExportBusy('copy')
       const dataUrl = await getSelectionDataUrl()
       await window.noteCanvas.copyImage(dataUrl)
-      setExportMessage('已复制 PNG 到剪贴板')
+      setExportMessage('??? PNG ????')
     } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : '复制失败')
+      setExportMessage(error instanceof Error ? error.message : '????')
     } finally {
       setExportBusy(null)
     }
@@ -391,10 +462,10 @@ export function BoardEditor({
         `${makeExportName(note.title)}-selection`,
       )
       if (result) {
-        setExportMessage(`已导出到 ${result}`)
+        setExportMessage(`???? ${result}`)
       }
     } catch (error) {
-      setExportMessage(error instanceof Error ? error.message : '导出失败')
+      setExportMessage(error instanceof Error ? error.message : '????')
     } finally {
       setExportBusy(null)
     }
@@ -415,134 +486,168 @@ export function BoardEditor({
 
   return (
     <div className="board-shell">
+      <div className="board-page-controls" data-export-ignore="true">
+        <span>? {pages.length} ?</span>
+        <button className="secondary-button" type="button" onClick={addPage}>
+          <Plus size={14} />
+          <span>??</span>
+        </button>
+      </div>
+
       <div ref={stageRef} className="board-stage" onWheel={handleStageWheel}>
-        <div
-          className="board-zoom-frame"
-          style={{
-            width: note.document.width * zoom,
-            height: note.document.height * zoom,
-          }}
-        >
-        <div
-          ref={boardRef}
-          className={clsx('board-surface', tool === 'export' && 'selection-mode')}
-          style={{
-            width: note.document.width,
-            height: note.document.height,
-            transform: `scale(${zoom})`,
-          }}
-          onPointerDown={handleBoardPointerDown}
-        >
-          <div className="paper-overlay" data-export-ignore="true" />
+        <div className="board-pages">
+          {pages.map((page, pageIndex) => {
+            const isActivePage = page.id === activePage.id
 
-          <svg
-            className={clsx('ink-layer', (tool === 'pen' || tool === 'eraser' || tool === 'export') && 'active')}
-            width={note.document.width}
-            height={note.document.height}
-            onPointerDown={handleOverlayPointerDown}
-            onPointerMove={handleOverlayPointerMove}
-            onPointerUp={handleOverlayPointerUp}
-            onPointerLeave={handleOverlayPointerUp}
-          >
-            {note.document.strokes.map((stroke) => (
-              <path
-                key={stroke.id}
-                d={pointsToPath(stroke.points)}
-                fill="none"
-                stroke={stroke.color}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={stroke.width}
-                strokeOpacity={stroke.opacity}
-              />
-            ))}
+            return (
+              <section key={page.id} className={clsx('board-page-shell', isActivePage && 'active')}>
+                <div className="board-page-meta" data-export-ignore="true">
+                  <button type="button" onClick={() => setActivePage(page.id)}>
+                    ? {pageIndex + 1} ?
+                  </button>
+                  <span>{page.width} ? {page.height}</span>
+                </div>
 
-            {draftPoints.length > 0 ? (
-              <path
-                d={pointsToPath(draftPoints)}
-                fill="none"
-                stroke={penColor}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={penWidth}
-              />
-            ) : null}
-          </svg>
+                <div
+                  className="board-zoom-frame"
+                  style={{
+                    width: page.width * zoom,
+                    height: page.height * zoom,
+                  }}
+                >
+                  <div
+                    ref={(node) => {
+                      if (node) {
+                        pageRefs.current.set(page.id, node)
+                      } else {
+                        pageRefs.current.delete(page.id)
+                      }
+                    }}
+                    className={clsx('board-surface', tool === 'export' && 'selection-mode')}
+                    style={{
+                      width: page.width,
+                      height: page.height,
+                      transform: `scale(${zoom})`,
+                    }}
+                    onPointerDown={(event) => handleBoardPointerDown(event, page)}
+                  >
+                    <div className="paper-overlay" data-export-ignore="true" />
 
-          {note.document.textBlocks.map((block) => (
-            <RichTextBlock
-              key={block.id}
-              block={block}
-              active={activeTextBlockId === block.id}
-              interactive={canEditText}
-              onActivate={onActiveTextBlockChange}
-              onChange={(nextBlock) =>
-                updateDocument((document) => ({
-                  ...document,
-                  textBlocks: document.textBlocks.map((candidate) =>
-                    candidate.id === nextBlock.id ? nextBlock : candidate,
-                  ),
-                }))
-              }
-              onRemove={removeTextBlock}
-            />
-          ))}
+                    <svg
+                      className={clsx('ink-layer', (tool === 'pen' || tool === 'eraser' || tool === 'export') && 'active')}
+                      width={page.width}
+                      height={page.height}
+                      onPointerDown={(event) => handleOverlayPointerDown(event, page)}
+                      onPointerMove={(event) => handleOverlayPointerMove(event, page)}
+                      onPointerUp={handleOverlayPointerUp}
+                      onPointerLeave={handleOverlayPointerUp}
+                    >
+                      {page.strokes.map((stroke) => (
+                        <path
+                          key={stroke.id}
+                          d={pointsToPath(stroke.points)}
+                          fill="none"
+                          stroke={stroke.color}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={stroke.width}
+                          strokeOpacity={stroke.opacity}
+                        />
+                      ))}
 
-          {selection ? (
-            <div
-              className="selection-rect"
-              data-export-ignore="true"
-              style={{
-                left: selection.x,
-                top: selection.y,
-                width: selection.width,
-                height: selection.height,
-              }}
-            />
-          ) : null}
+                      {isActivePage && draftPoints.length > 0 ? (
+                        <path
+                          d={pointsToPath(draftPoints)}
+                          fill="none"
+                          stroke={penColor}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={penWidth}
+                        />
+                      ) : null}
+                    </svg>
 
-          {selection ? (
-            <div className="selection-toolbar" data-export-ignore="true" style={toolbarStyle}>
-              <div
-                className={clsx('drag-chip', dragLoading && 'loading')}
-                draggable={Boolean(dragPath) && !dragLoading}
-                onDragStart={(event) => {
-                  if (!dragPath) {
-                    event.preventDefault()
-                    return
-                  }
+                    {page.textBlocks.map((block) => (
+                      <RichTextBlock
+                        key={block.id}
+                        block={block}
+                        active={activeTextBlockId === block.id}
+                        interactive={canEditText && isActivePage}
+                        onActivate={(blockId) => {
+                          setActivePage(page.id)
+                          onActiveTextBlockChange(blockId)
+                        }}
+                        onChange={(nextBlock) =>
+                          updatePage(page.id, (currentPage) => ({
+                            ...currentPage,
+                            textBlocks: currentPage.textBlocks.map((candidate) =>
+                              candidate.id === nextBlock.id ? nextBlock : candidate,
+                            ),
+                          }))
+                        }
+                        onRemove={removeTextBlock}
+                      />
+                    ))}
 
-                  event.dataTransfer.setData('text/plain', note.title)
-                  window.noteCanvas.startFileDrag(dragPath)
-                }}
-              >
-                {dragLoading ? (
-                  <>
-                    <LoaderCircle size={14} className="spin" />
-                    <span>准备拖拽…</span>
-                  </>
-                ) : (
-                  <span>拖出 PNG</span>
-                )}
-              </div>
+                    {selection?.pageId === page.id ? (
+                      <div
+                        className="selection-rect"
+                        data-export-ignore="true"
+                        style={{
+                          left: selection.x,
+                          top: selection.y,
+                          width: selection.width,
+                          height: selection.height,
+                        }}
+                      />
+                    ) : null}
 
-              <button className="secondary-button" type="button" onClick={handleCopy}>
-                <Copy size={14} />
-                <span>{exportBusy === 'copy' ? '复制中…' : '复制'}</span>
-              </button>
-              <button className="secondary-button" type="button" onClick={handleSave}>
-                <Download size={14} />
-                <span>{exportBusy === 'save' ? '导出中…' : '另存 PNG'}</span>
-              </button>
-            </div>
-          ) : null}
-        </div>
+                    {selection?.pageId === page.id ? (
+                      <div className="selection-toolbar" data-export-ignore="true" style={toolbarStyle}>
+                        <div
+                          className={clsx('drag-chip', dragLoading && 'loading')}
+                          draggable={Boolean(dragPath) && !dragLoading}
+                          onDragStart={(event) => {
+                            if (!dragPath) {
+                              event.preventDefault()
+                              return
+                            }
+
+                            event.dataTransfer.setData('text/plain', note.title)
+                            window.noteCanvas.startFileDrag(dragPath)
+                          }}
+                        >
+                          {dragLoading ? (
+                            <>
+                              <LoaderCircle size={14} className="spin" />
+                              <span>?????</span>
+                            </>
+                          ) : (
+                            <span>?? PNG</span>
+                          )}
+                        </div>
+
+                        <button className="secondary-button" type="button" onClick={handleCopy}>
+                          <Copy size={14} />
+                          <span>{exportBusy === 'copy' ? '????' : '??'}</span>
+                        </button>
+                        <button className="secondary-button" type="button" onClick={handleSave}>
+                          <Download size={14} />
+                          <span>{exportBusy === 'save' ? '????' : '?? PNG'}</span>
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+            )
+          })}
         </div>
       </div>
 
       <div className="editor-statusbar">
-        <span>{tool === 'export' ? '拖拽到文件夹 / 网页上传区即可落为完整 PNG' : '本页支持文本块、手绘与区域导出'}</span>
-        <span>{exportMessage ?? `画布尺寸 ${note.document.width} × ${note.document.height} · 缩放 ${Math.round(zoom * 100)}%`}</span>
+        <span>{tool === 'export' ? '?????? / ??????????? PNG' : '???????????????'}</span>
+        <span>{exportMessage ?? `??? ${activePage.width} ? ${activePage.height} ? ?? ${Math.round(zoom * 100)}%`}</span>
       </div>
     </div>
   )
