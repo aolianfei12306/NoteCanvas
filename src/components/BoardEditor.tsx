@@ -1,10 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Copy, Download, LoaderCircle, Plus } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  Copy,
+  Download,
+  Eye,
+  EyeOff,
+  LoaderCircle,
+  Lock,
+  Plus,
+  Unlock,
+} from 'lucide-react'
 import {
   clampExportRect,
   createBoardPage,
+  createLayer,
   createTextBlock,
+  getActiveLayer,
   getActivePage,
   touchNote,
   type BoardPageRecord,
@@ -45,9 +58,10 @@ function pointsToPath(points: Point[]) {
   }, '')
 }
 
-function buildStroke(points: Point[], color: string, width: number): StrokeRecord {
+function buildStroke(points: Point[], color: string, width: number, layerId: string): StrokeRecord {
   return {
     id: `stroke_${crypto.randomUUID()}`,
+    layerId,
     color,
     width,
     opacity: 1,
@@ -62,6 +76,11 @@ function hitStroke(point: Point, stroke: StrokeRecord) {
 
 function clampZoom(value: number) {
   return Math.max(0.4, Math.min(value, 2.5))
+}
+
+function canEditLayer(page: BoardPageRecord) {
+  const layer = getActiveLayer(page)
+  return Boolean(layer?.visible && !layer.locked)
 }
 
 export function BoardEditor({
@@ -91,6 +110,7 @@ export function BoardEditor({
 
   const pages = note.document.pages
   const activePage = getActivePage(note.document)
+  const activeLayer = getActiveLayer(activePage)
   const canEditText = tool === 'browse' || tool === 'text'
 
   const selectionKey = useMemo(() => {
@@ -156,6 +176,100 @@ export function BoardEditor({
     }))
     onActiveTextBlockChange(null)
     setSelection(null)
+  }
+
+  function addLayer() {
+    const layer = createLayer(`?? ${activePage.layers.length + 1}`)
+
+    updatePage(activePage.id, (page) => ({
+      ...page,
+      layers: [...page.layers, layer],
+      activeLayerId: layer.id,
+    }))
+    onActiveTextBlockChange(null)
+  }
+
+  function selectLayer(layerId: string) {
+    updatePage(activePage.id, (page) => ({
+      ...page,
+      activeLayerId: layerId,
+    }))
+    onActiveTextBlockChange(null)
+  }
+
+  function renameLayer(layerId: string) {
+    const currentLayer = activePage.layers.find((layer) => layer.id === layerId)
+    if (!currentLayer) {
+      return
+    }
+
+    const nextName = window.prompt('?????', currentLayer.name)?.trim()
+    if (!nextName) {
+      return
+    }
+
+    updatePage(activePage.id, (page) => ({
+      ...page,
+      layers: page.layers.map((layer) =>
+        layer.id === layerId
+          ? {
+              ...layer,
+              name: nextName,
+              updatedAt: new Date().toISOString(),
+            }
+          : layer,
+      ),
+    }))
+  }
+
+  function toggleLayerVisibility(layerId: string) {
+    updatePage(activePage.id, (page) => ({
+      ...page,
+      layers: page.layers.map((layer) =>
+        layer.id === layerId
+          ? {
+              ...layer,
+              visible: !layer.visible,
+              updatedAt: new Date().toISOString(),
+            }
+          : layer,
+      ),
+    }))
+  }
+
+  function toggleLayerLock(layerId: string) {
+    updatePage(activePage.id, (page) => ({
+      ...page,
+      layers: page.layers.map((layer) =>
+        layer.id === layerId
+          ? {
+              ...layer,
+              locked: !layer.locked,
+              updatedAt: new Date().toISOString(),
+            }
+          : layer,
+      ),
+    }))
+  }
+
+  function moveLayer(layerId: string, direction: -1 | 1) {
+    updatePage(activePage.id, (page) => {
+      const currentIndex = page.layers.findIndex((layer) => layer.id === layerId)
+      const nextIndex = currentIndex + direction
+
+      if (currentIndex < 0 || nextIndex < 0 || nextIndex >= page.layers.length) {
+        return page
+      }
+
+      const layers = [...page.layers]
+      const [layer] = layers.splice(currentIndex, 1)
+      layers.splice(nextIndex, 0, layer)
+
+      return {
+        ...page,
+        layers,
+      }
+    })
   }
 
   function getBoardPoint(event: React.PointerEvent | PointerEvent, page: BoardPageRecord): Point | null {
@@ -224,13 +338,18 @@ export function BoardEditor({
   }
 
   function eraseAt(page: BoardPageRecord, point: Point) {
-    if (!page.strokes.some((stroke) => hitStroke(point, stroke))) {
+    if (!canEditLayer(page)) {
+      setExportMessage('??????????')
+      return
+    }
+
+    if (!page.strokes.some((stroke) => stroke.layerId === page.activeLayerId && hitStroke(point, stroke))) {
       return
     }
 
     updatePage(page.id, (currentPage) => ({
       ...currentPage,
-      strokes: currentPage.strokes.filter((stroke) => !hitStroke(point, stroke)),
+      strokes: currentPage.strokes.filter((stroke) => stroke.layerId !== page.activeLayerId || !hitStroke(point, stroke)),
     }))
   }
 
@@ -242,12 +361,18 @@ export function BoardEditor({
         return
       }
 
+      if (!canEditLayer(page)) {
+        setExportMessage('??????????')
+        return
+      }
+
       const point = getBoardPoint(event, page)
       if (!point) {
         return
       }
 
       const block = createTextBlock({
+        layerId: page.activeLayerId,
         x: point.x,
         y: point.y,
         width: 420,
@@ -278,6 +403,11 @@ export function BoardEditor({
     pointerPageIdRef.current = page.id
 
     if (tool === 'pen') {
+      if (!canEditLayer(page)) {
+        setExportMessage('??????????')
+        return
+      }
+
       pointerModeRef.current = 'draw'
       draftPointsRef.current = [point]
       setDraftPoints([point])
@@ -345,7 +475,7 @@ export function BoardEditor({
     const page = pages.find((candidate) => candidate.id === pointerPageIdRef.current)
 
     if (page && pointerModeRef.current === 'draw' && draftPointsRef.current.length > 1) {
-      const nextStroke = buildStroke(draftPointsRef.current, penColor, penWidth)
+      const nextStroke = buildStroke(draftPointsRef.current, penColor, penWidth, page.activeLayerId)
       updatePage(page.id, (currentPage) => ({
         ...currentPage,
         strokes: [...currentPage.strokes, nextStroke],
@@ -487,17 +617,61 @@ export function BoardEditor({
   return (
     <div className="board-shell">
       <div className="board-page-controls" data-export-ignore="true">
-        <span>? {pages.length} ?</span>
-        <button className="secondary-button" type="button" onClick={addPage}>
-          <Plus size={14} />
-          <span>??</span>
-        </button>
+        <div className="page-actions">
+          <span>? {pages.length} ?</span>
+          <button className="secondary-button" type="button" onClick={addPage}>
+            <Plus size={14} />
+            <span>??</span>
+          </button>
+        </div>
+
+        <div className="layer-panel">
+          <div className="layer-panel-header">
+            <span>???{activeLayer?.name}</span>
+            <button className="icon-button subtle" type="button" onClick={addLayer} aria-label="????">
+              <Plus size={14} />
+            </button>
+          </div>
+          <div className="layer-list">
+            {activePage.layers.map((layer, layerIndex) => {
+              const isActiveLayer = layer.id === activePage.activeLayerId
+
+              return (
+                <div key={layer.id} className={clsx('layer-row', isActiveLayer && 'active')}>
+                  <button
+                    className="layer-main-button"
+                    type="button"
+                    onClick={() => selectLayer(layer.id)}
+                    onDoubleClick={() => renameLayer(layer.id)}
+                    title="???????"
+                  >
+                    {layer.name}
+                  </button>
+                  <button className="icon-button subtle" type="button" onClick={() => toggleLayerVisibility(layer.id)} aria-label="??????">
+                    {layer.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                  </button>
+                  <button className="icon-button subtle" type="button" onClick={() => toggleLayerLock(layer.id)} aria-label="??????">
+                    {layer.locked ? <Lock size={14} /> : <Unlock size={14} />}
+                  </button>
+                  <button className="icon-button subtle" type="button" onClick={() => moveLayer(layer.id, 1)} disabled={layerIndex === activePage.layers.length - 1} aria-label="????">
+                    <ArrowUp size={14} />
+                  </button>
+                  <button className="icon-button subtle" type="button" onClick={() => moveLayer(layer.id, -1)} disabled={layerIndex === 0} aria-label="????">
+                    <ArrowDown size={14} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       <div ref={stageRef} className="board-stage" onWheel={handleStageWheel}>
         <div className="board-pages">
           {pages.map((page, pageIndex) => {
             const isActivePage = page.id === activePage.id
+            const visibleLayerIds = new Set(page.layers.filter((layer) => layer.visible).map((layer) => layer.id))
+            const pageCanEditLayer = canEditLayer(page)
 
             return (
               <section key={page.id} className={clsx('board-page-shell', isActivePage && 'active')}>
@@ -542,18 +716,20 @@ export function BoardEditor({
                       onPointerUp={handleOverlayPointerUp}
                       onPointerLeave={handleOverlayPointerUp}
                     >
-                      {page.strokes.map((stroke) => (
-                        <path
-                          key={stroke.id}
-                          d={pointsToPath(stroke.points)}
-                          fill="none"
-                          stroke={stroke.color}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={stroke.width}
-                          strokeOpacity={stroke.opacity}
-                        />
-                      ))}
+                      {page.layers.filter((layer) => layer.visible).flatMap((layer) =>
+                        page.strokes.filter((stroke) => stroke.layerId === layer.id).map((stroke) => (
+                          <path
+                            key={stroke.id}
+                            d={pointsToPath(stroke.points)}
+                            fill="none"
+                            stroke={stroke.color}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={stroke.width}
+                            strokeOpacity={stroke.opacity}
+                          />
+                        )),
+                      )}
 
                       {isActivePage && draftPoints.length > 0 ? (
                         <path
@@ -567,12 +743,12 @@ export function BoardEditor({
                       ) : null}
                     </svg>
 
-                    {page.textBlocks.map((block) => (
+                    {page.textBlocks.filter((block) => visibleLayerIds.has(block.layerId)).map((block) => (
                       <RichTextBlock
                         key={block.id}
                         block={block}
                         active={activeTextBlockId === block.id}
-                        interactive={canEditText && isActivePage}
+                        interactive={canEditText && isActivePage && pageCanEditLayer && block.layerId === page.activeLayerId}
                         onActivate={(blockId) => {
                           setActivePage(page.id)
                           onActiveTextBlockChange(blockId)

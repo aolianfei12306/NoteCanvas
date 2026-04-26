@@ -288,6 +288,7 @@ button {
 }
 
 .tool-button:disabled,
+.icon-button:disabled,
 .icon-text-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -419,6 +420,61 @@ button {
   padding: 0 8px;
   color: #6b7280;
   font-size: 13px;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.layer-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.layer-panel-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.layer-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(58vw, 760px);
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.layer-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.layer-row.active {
+  border-color: rgba(217, 119, 6, 0.24);
+  background: #fff8ec;
+}
+
+.layer-main-button {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 12px;
+  background: transparent;
+  color: #3f3f46;
+  padding: 6px 8px;
 }
 
 .board-stage {

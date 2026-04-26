@@ -12,8 +12,18 @@ export interface ExportRect {
   height: number
 }
 
+export interface LayerRecord {
+  id: string
+  name: string
+  visible: boolean
+  locked: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface TextBlockRecord {
   id: string
+  layerId: string
   x: number
   y: number
   width: number
@@ -25,6 +35,7 @@ export interface TextBlockRecord {
 
 export interface StrokeRecord {
   id: string
+  layerId: string
   color: string
   width: number
   opacity: number
@@ -36,6 +47,8 @@ export interface BoardPageRecord {
   id: string
   width: number
   height: number
+  layers: LayerRecord[]
+  activeLayerId: string
   textBlocks: TextBlockRecord[]
   strokes: StrokeRecord[]
   createdAt: string
@@ -50,10 +63,16 @@ export interface BoardDocument {
 interface LegacyBoardDocument {
   width?: number
   height?: number
-  textBlocks?: TextBlockRecord[]
-  strokes?: StrokeRecord[]
-  pages?: Partial<BoardPageRecord>[]
+  textBlocks?: Array<Partial<TextBlockRecord>>
+  strokes?: Array<Partial<StrokeRecord>>
+  pages?: Array<Partial<BoardPageRecord>>
   activePageId?: string
+}
+
+type BoardPageInput = Omit<Partial<BoardPageRecord>, 'layers' | 'textBlocks' | 'strokes'> & {
+  layers?: Array<Partial<LayerRecord>>
+  textBlocks?: Array<Partial<TextBlockRecord>>
+  strokes?: Array<Partial<StrokeRecord>>
 }
 
 export interface FolderRecord {
@@ -106,11 +125,25 @@ export function createFolder(name = '?????', parentId: string | null = null): Fo
   }
 }
 
+export function createLayer(name = '?? 1', partial: Partial<LayerRecord> = {}): LayerRecord {
+  const createdAt = nowIso()
+
+  return {
+    id: partial.id ?? makeId('layer'),
+    name: partial.name ?? name,
+    visible: partial.visible ?? true,
+    locked: partial.locked ?? false,
+    createdAt: partial.createdAt ?? createdAt,
+    updatedAt: partial.updatedAt ?? createdAt,
+  }
+}
+
 export function createTextBlock(partial: Partial<TextBlockRecord> = {}): TextBlockRecord {
   const createdAt = nowIso()
 
   return {
     id: partial.id ?? makeId('text'),
+    layerId: partial.layerId ?? 'layer_default',
     x: partial.x ?? 120,
     y: partial.y ?? 120,
     width: partial.width ?? 520,
@@ -121,18 +154,61 @@ export function createTextBlock(partial: Partial<TextBlockRecord> = {}): TextBlo
   }
 }
 
-export function createBoardPage(partial: Partial<BoardPageRecord> = {}): BoardPageRecord {
+function normalizeTextBlock(block: Partial<TextBlockRecord>, fallbackLayerId: string): TextBlockRecord {
+  return createTextBlock({
+    ...block,
+    layerId: block.layerId || fallbackLayerId,
+  })
+}
+
+function normalizeStroke(stroke: Partial<StrokeRecord>, fallbackLayerId: string): StrokeRecord | null {
+  if (!Array.isArray(stroke.points)) {
+    return null
+  }
+
+  return {
+    id: stroke.id ?? makeId('stroke'),
+    layerId: stroke.layerId || fallbackLayerId,
+    color: stroke.color ?? '#111827',
+    width: stroke.width ?? 4,
+    opacity: stroke.opacity ?? 1,
+    points: stroke.points,
+    createdAt: stroke.createdAt ?? nowIso(),
+  }
+}
+
+export function createBoardPage(partial: BoardPageInput = {}): BoardPageRecord {
   const createdAt = nowIso()
+  const layers = Array.isArray(partial.layers) && partial.layers.length > 0
+    ? partial.layers.map((layer, index) => createLayer(`?? ${index + 1}`, layer))
+    : [createLayer('?? 1')]
+  const layerIds = new Set(layers.map((layer) => layer.id))
+  const activeLayerId = partial.activeLayerId && layerIds.has(partial.activeLayerId)
+    ? partial.activeLayerId
+    : layers[0].id
 
   return {
     id: partial.id ?? makeId('page'),
     width: partial.width ?? DEFAULT_BOARD_WIDTH,
     height: partial.height ?? DEFAULT_BOARD_HEIGHT,
-    textBlocks: Array.isArray(partial.textBlocks) ? partial.textBlocks : [],
-    strokes: Array.isArray(partial.strokes) ? partial.strokes : [],
+    layers,
+    activeLayerId,
+    textBlocks: Array.isArray(partial.textBlocks)
+      ? partial.textBlocks.map((block) => normalizeTextBlock(block, activeLayerId))
+      : [],
+    strokes: Array.isArray(partial.strokes)
+      ? partial.strokes.flatMap((stroke) => {
+          const normalized = normalizeStroke(stroke, activeLayerId)
+          return normalized ? [normalized] : []
+        })
+      : [],
     createdAt: partial.createdAt ?? createdAt,
     updatedAt: partial.updatedAt ?? createdAt,
   }
+}
+
+export function getActiveLayer(page: BoardPageRecord) {
+  return page.layers.find((layer) => layer.id === page.activeLayerId) ?? page.layers[0]
 }
 
 export function createBlankDocument(): BoardDocument {
@@ -156,6 +232,7 @@ export function createNote(folderId: string, title = UNTITLED_NOTE, withStarterC
   if (withStarterContent) {
     firstPage.textBlocks.push(
       createTextBlock({
+        layerId: firstPage.activeLayerId,
         x: 96,
         y: 96,
         width: 620,
@@ -261,17 +338,7 @@ export function createDefaultLibrary(): LibrarySnapshot {
 
 function normalizeDocument(document: LegacyBoardDocument | null | undefined): BoardDocument {
   if (Array.isArray(document?.pages) && document.pages.length > 0) {
-    const pages = document.pages.map((page) =>
-      createBoardPage({
-        id: page.id,
-        width: page.width || DEFAULT_BOARD_WIDTH,
-        height: page.height || DEFAULT_BOARD_HEIGHT,
-        textBlocks: Array.isArray(page.textBlocks) ? page.textBlocks : [],
-        strokes: Array.isArray(page.strokes) ? page.strokes : [],
-        createdAt: page.createdAt,
-        updatedAt: page.updatedAt,
-      }),
-    )
+    const pages = document.pages.map((page) => createBoardPage(page))
     const pageIds = new Set(pages.map((page) => page.id))
     const activePageId = document.activePageId && pageIds.has(document.activePageId)
       ? document.activePageId

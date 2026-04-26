@@ -15,6 +15,7 @@ describe('createDefaultLibrary', () => {
     expect(snapshot.notes).toHaveLength(1)
     expect(snapshot.lastOpenedNoteId).toBe(snapshot.notes[0].id)
     expect(snapshot.notes[0].document.pages).toHaveLength(1)
+    expect(snapshot.notes[0].document.pages[0].layers).toHaveLength(1)
   })
 })
 
@@ -24,6 +25,7 @@ describe('createBlankDocument', () => {
 
     expect(document.pages).toHaveLength(1)
     expect(document.activePageId).toBe(document.pages[0].id)
+    expect(document.pages[0].activeLayerId).toBe(document.pages[0].layers[0].id)
   })
 })
 
@@ -68,8 +70,28 @@ describe('normalizeLibrarySnapshot', () => {
           document: {
             width: 300,
             height: 400,
-            textBlocks: [],
-            strokes: [],
+            textBlocks: [
+              {
+                id: 'text_1',
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 100,
+                html: '<p>Legacy</p>',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+            ],
+            strokes: [
+              {
+                id: 'stroke_1',
+                color: '#111827',
+                width: 4,
+                opacity: 1,
+                points: [{ x: 0, y: 0 }],
+                createdAt: new Date().toISOString(),
+              },
+            ],
           } as never,
         },
       ],
@@ -78,6 +100,12 @@ describe('normalizeLibrarySnapshot', () => {
     expect(normalized.notes[0].document.pages).toHaveLength(1)
     expect(normalized.notes[0].document.pages[0].width).toBe(300)
     expect(normalized.notes[0].document.pages[0].height).toBe(400)
+    expect(normalized.notes[0].document.pages[0].textBlocks[0].layerId).toBe(
+      normalized.notes[0].document.pages[0].activeLayerId,
+    )
+    expect(normalized.notes[0].document.pages[0].strokes[0].layerId).toBe(
+      normalized.notes[0].document.pages[0].activeLayerId,
+    )
   })
 })
 
