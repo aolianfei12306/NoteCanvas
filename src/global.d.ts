@@ -5,6 +5,9 @@ declare global {
     noteCanvas: {
       loadLibrary: () => Promise<LibrarySnapshot>
       saveLibrary: (snapshot: LibrarySnapshot) => Promise<void>
+      getDataPath: () => Promise<string>
+      openDataPath: () => Promise<void>
+      exportLibrary: (snapshot: LibrarySnapshot) => Promise<string | null>
       stageDragImage: (dataUrl: string, fileName: string) => Promise<string>
       startFileDrag: (filePath: string) => void
       copyImage: (dataUrl: string) => Promise<void>

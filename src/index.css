@@ -11,6 +11,11 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root[data-theme='dark'] {
+  color: #e5e7eb;
+  background: #111827;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -171,6 +176,12 @@ button {
   padding: 12px 14px;
   background: transparent;
   color: inherit;
+}
+
+:root[data-theme='dark'] body {
+  background:
+    radial-gradient(circle at top, rgba(55, 65, 81, 0.7), transparent 40%),
+    linear-gradient(180deg, #111827 0%, #1f2937 100%);
 }
 
 .folder-rename-form {
@@ -410,6 +421,11 @@ button {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.header-summary .icon-text-button {
+  width: auto;
+  padding: 8px 12px;
 }
 
 .board-page-controls {
@@ -670,6 +686,88 @@ button {
   padding: 0 8px;
   color: #6b7280;
   font-size: 13px;
+}
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(17, 24, 39, 0.34);
+  backdrop-filter: blur(8px);
+}
+
+.settings-panel {
+  width: min(860px, 100%);
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  border-radius: 28px;
+  background: rgba(255, 252, 246, 0.97);
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.22);
+  padding: 22px;
+}
+
+.settings-header,
+.settings-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-header h2,
+.settings-section-card h3,
+.settings-section-card p {
+  margin: 0;
+}
+
+.settings-grid,
+.hotkey-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.setting-field,
+.hotkey-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.setting-field input,
+.setting-field select,
+.hotkey-grid input {
+  width: 100%;
+  border: 1px solid rgba(217, 119, 6, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  color: #111827;
+  outline: 0;
+  padding: 9px 10px;
+}
+
+.settings-section-card {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid rgba(217, 119, 6, 0.12);
+  border-radius: 20px;
+  background: rgba(255, 248, 236, 0.68);
+}
+
+.settings-section-card p {
+  margin-top: 8px;
+  color: #6b7280;
+  overflow-wrap: anywhere;
+}
+
+.settings-message {
+  color: #047857 !important;
 }
 
 .empty-editor-state {

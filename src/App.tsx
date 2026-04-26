@@ -1,20 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Settings } from 'lucide-react'
 import { normalizeLibrarySnapshot, createFolder, createNote, deriveNoteTitle, sortFolders, sortNotes, touchNote, type LibrarySnapshot, type NoteRecord, type ToolMode } from '../shared/model'
 import { EditorToolbar } from './components/EditorToolbar'
 import { BoardEditor } from './components/BoardEditor'
 import { Sidebar } from './components/Sidebar'
+import { SettingsPanel } from './components/SettingsPanel'
 import { applyTextFormat, type TextFormatCommand } from './lib/textFormat'
+import { applyTheme, loadAppSettings, saveAppSettings, type AppSettings } from './lib/settings'
 
 function App() {
+  const [settings, setSettings] = useState(loadAppSettings)
   const [library, setLibrary] = useState<LibrarySnapshot | null>(null)
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [tool, setTool] = useState<ToolMode>('browse')
-  const [penColor, setPenColor] = useState('#111827')
-  const [penWidth, setPenWidth] = useState(4)
+  const [penColor, setPenColor] = useState(settings.defaultPenColor)
+  const [penWidth, setPenWidth] = useState(settings.defaultPenWidth)
   const [activeTextBlockId, setActiveTextBlockId] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [dataPath, setDataPath] = useState<string | null>(null)
   const skipNextSaveRef = useRef(true)
 
   useEffect(() => {
@@ -58,10 +64,22 @@ function App() {
       } catch {
         setSaveState('error')
       }
-    }, 500)
+    }, Math.max(250, settings.autosaveIntervalMs))
 
     return () => window.clearTimeout(timer)
-  }, [library, selectedNoteId])
+  }, [library, selectedNoteId, settings.autosaveIntervalMs])
+
+  useEffect(() => {
+    applyTheme(settings.theme)
+  }, [settings.theme])
+
+  useEffect(() => {
+    if (!settingsOpen) {
+      return
+    }
+
+    window.noteCanvas.getDataPath().then(setDataPath).catch(() => setDataPath('无法读取数据目录'))
+  }, [settingsOpen])
 
   const folders = useMemo(() => (library ? sortFolders(library.folders) : []), [library])
 
@@ -251,6 +269,11 @@ function App() {
     applyTextFormat(command)
   }
 
+  function handleSettingsChange(nextSettings: AppSettings) {
+    setSettings(nextSettings)
+    saveAppSettings(nextSettings)
+  }
+
   function handleToolChange(nextTool: ToolMode) {
     setTool(nextTool)
 
@@ -335,6 +358,10 @@ function App() {
             <span>{currentNoteStats.pages} 页</span>
             <span>{currentNoteStats.textBlocks} 个文本块</span>
             <span>{currentNoteStats.strokes} 笔线条</span>
+            <button className="icon-text-button" type="button" onClick={() => setSettingsOpen(true)}>
+              <Settings size={16} />
+              <span>设置</span>
+            </button>
           </div>
         </header>
 
@@ -370,6 +397,16 @@ function App() {
           </div>
         )}
       </section>
+
+      {settingsOpen && library ? (
+        <SettingsPanel
+          settings={settings}
+          library={library}
+          dataPath={dataPath}
+          onChange={handleSettingsChange}
+          onClose={() => setSettingsOpen(false)}
+        />
+      ) : null}
     </main>
   )
 }

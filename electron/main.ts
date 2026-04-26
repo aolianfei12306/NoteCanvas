@@ -8,6 +8,7 @@ import {
   dialog,
   ipcMain,
   nativeImage,
+  shell,
 } from 'electron'
 import {
   createDefaultLibrary,
@@ -133,6 +134,25 @@ process.on('message', (message) => {
 
 ipcMain.handle('library:load', async () => loadLibrary())
 ipcMain.handle('library:save', async (_, snapshot: LibrarySnapshot) => saveLibrary(snapshot))
+ipcMain.handle('library:data-path', async () => workspacePath)
+ipcMain.handle('library:open-data-path', async () => {
+  await ensureDirectory(workspacePath)
+  await shell.openPath(workspacePath)
+})
+ipcMain.handle('library:export', async (_, snapshot: LibrarySnapshot) => {
+  const result = await dialog.showSaveDialog({
+    title: '导出工作库',
+    defaultPath: path.join(app.getPath('documents'), 'notecanvas-library.json'),
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  })
+
+  if (result.canceled || !result.filePath) {
+    return null
+  }
+
+  await fs.writeFile(result.filePath, JSON.stringify(normalizeLibrarySnapshot(snapshot), null, 2), 'utf8')
+  return result.filePath
+})
 
 ipcMain.handle('image:stage-drag', async (_, dataUrl: string, fileName: string) =>
   stageDragImage(dataUrl, fileName),
